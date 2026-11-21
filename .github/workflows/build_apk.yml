@@ -1,0 +1,278 @@
+name: Build Flutter Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_local_ai:
+        description: "بناء التطبيق مع الذكاء الاصطناعي المحلي (نموذج Qwen GGUF + llamafu)"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free GitHub runner disk space
+        shell: bash
+        run: bash scripts/free_github_runner_disk.sh
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: "stable"
+          cache: true
+
+      - name: Verify Flutter environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version
+          dart --version
+          echo "PUB_CACHE=${PUB_CACHE:-$HOME/.pub-cache}"
+          echo "Include Local AI: ${{ inputs.include_local_ai }}"
+          df -h /
+
+      - name: Configure project for No-AI build
+        if: ${{ !inputs.include_local_ai }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Configuring pubspec.yaml for build WITHOUT Local AI..."
+          sed -i '/^[[:space:]]*llamafu:/d' pubspec.yaml
+          sed -i '/assets\/models\//d' pubspec.yaml
+          mkdir -p assets/models
+          python3 scripts/stub_local_ai.py
+
+      - name: Verify Android configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Gradle wrapper ==="
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          echo "=== Android settings ==="
+          cat android/settings.gradle.kts
+          echo "=== Android app Gradle ==="
+          cat android/app/build.gradle.kts
+          echo "=== Internet permission ==="
+          grep -n 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
+
+      - name: Verify Android Embedding
+        shell: bash
+        run: |
+          set -euo pipefail
+          find android/app/src/main -type f \
+            \( -name "MainActivity.kt" -o -name "MainActivity.java" \) \
+            -print -exec cat {} \;
+          grep -Rni "flutterEmbedding" android/app/src/main/AndroidManifest.xml || true
+
+      - name: Install Android SDK 36, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_ROOT" ]; then
+            echo "ERROR: ANDROID_SDK_ROOT/ANDROID_HOME is not set."
+            exit 1
+          fi
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found at $SDKMANAGER"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          installed=0
+          for attempt in 1 2 3; do
+            echo "Android SDK 36 installation attempt $attempt/3"
+            if "$SDKMANAGER" --install \
+              "platforms;android-36" \
+              "build-tools;36.0.0" \
+              "ndk;28.2.13676358" \
+              "cmake;3.18.1" \
+              "cmake;3.22.1"; then
+              if [ -f "$SDK_ROOT/platforms/android-36/android.jar" ] \
+                && [ -f "$SDK_ROOT/ndk/28.2.13676358/source.properties" ] \
+                && [ -x "$SDK_ROOT/cmake/3.18.1/bin/cmake" ] \
+                && [ -x "$SDK_ROOT/cmake/3.22.1/bin/cmake" ]; then
+                installed=1
+                break
+              fi
+            fi
+            echo "Android SDK installation incomplete; retrying..."
+            sleep 8
+          done
+
+          if [ "$installed" -ne 1 ]; then
+            echo "ERROR: Required Android SDK/NDK/CMake packages were not installed."
+            exit 1
+          fi
+
+          cat "$SDK_ROOT/ndk/28.2.13676358/source.properties"
+          "$SDK_ROOT/cmake/3.18.1/bin/cmake" --version
+          "$SDK_ROOT/cmake/3.22.1/bin/cmake" --version
+          df -h /
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Cache local AI model
+        if: ${{ inputs.include_local_ai }}
+        uses: actions/cache@v4
+        with:
+          path: assets/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+          key: emis-qwen25-05b-q4km-v1
+
+      - name: Prepare bundled local AI model
+        if: ${{ inputs.include_local_ai }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/models
+          MODEL="assets/models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+          if [ ! -s "$MODEL" ] || [ "$(stat -c%s "$MODEL")" -lt 400000000 ] \
+            || [ "$(head -c 4 "$MODEL" 2>/dev/null || true)" != "GGUF" ]; then
+            rm -f "$MODEL"
+            curl --fail --location --retry 3 --retry-delay 5 \
+              "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf?download=true" \
+              --output "$MODEL"
+          fi
+          SIZE="$(stat -c%s "$MODEL")"
+          if [ "$SIZE" -lt 400000000 ] || [ "$(head -c 4 "$MODEL")" != "GGUF" ]; then
+            echo "ERROR: GGUF model download is incomplete or invalid ($SIZE bytes)."
+            exit 1
+          fi
+          echo "GGUF model size: $SIZE bytes"
+          df -h /
+
+      - name: Upload resolved dependency lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: emis-resolved-pubspec-lock
+          path: pubspec.lock
+          if-no-files-found: error
+
+      - name: Patch llamafu Android Gradle compatibility
+        if: ${{ inputs.include_local_ai }}
+        run: python3 scripts/patch_llamafu_android.py
+
+      - name: Restore and patch pinned llama.cpp source
+        if: ${{ inputs.include_local_ai }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/restore_llama_cpp.py
+          CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
+          test -f "$CACHE/hosted/llama.cpp/CMakeLists.txt"
+          test -f "$CACHE/hosted/llama.cpp/tools/mtmd/CMakeLists.txt"
+          test -f "$CACHE/hosted/llama.cpp/tools/mtmd/clip.cpp"
+          echo "llama.cpp source and MTMD/CLI patches verified."
+
+      - name: Preflight Android and native build configuration
+        if: ${{ inputs.include_local_ai }}
+        run: python3 scripts/verify_android_build.py
+
+      - name: Decode release keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "ERROR: ANDROID_KEYSTORE_BASE64 is empty."
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "ERROR: One or both keystore password secrets are empty."
+            exit 1
+          fi
+
+          KEYSTORE_PATH="$RUNNER_TEMP/emis-release.jks"
+          if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" \
+            | tr -d '[:space:]' \
+            | base64 --decode > "$KEYSTORE_PATH"; then
+            rm -f "$KEYSTORE_PATH"
+            echo "ERROR: Invalid Base64 in ANDROID_KEYSTORE_BASE64."
+            exit 1
+          fi
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "ERROR: Decoded keystore is empty."
+            exit 1
+          fi
+          chmod 600 "$KEYSTORE_PATH"
+          if ! keytool -list -keystore "$KEYSTORE_PATH" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "emis-release" >/dev/null 2>&1; then
+            rm -f "$KEYSTORE_PATH"
+            echo "ERROR: Keystore password or alias emis-release is invalid."
+            exit 1
+          fi
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        timeout-minutes: 35
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false -Dorg.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G"
+          ENABLE_LOCAL_AI: ${{ inputs.include_local_ai }}
+        run: |
+          flutter build apk --release \
+            --target-platform android-arm,android-arm64 \
+            --dart-define=ENABLE_LOCAL_AI=${{ inputs.include_local_ai }}
+
+      - name: Verify APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          echo "APK size: $(stat -c%s "$APK") bytes"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_ROOT" ] || [ ! -d "$SDK_ROOT/build-tools" ]; then
+            echo "ERROR: Android SDK build-tools directory was not found."
+            exit 1
+          fi
+          APKSIGNER="$SDK_ROOT/build-tools/36.0.0/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            APKSIGNER="$(find "$SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner -perm -u+x 2>/dev/null | sort -V | tail -n 1)"
+          fi
+          if [ -z "$APKSIGNER" ] || [ ! -x "$APKSIGNER" ]; then
+            echo "ERROR: apksigner was not found in installed Android Build Tools."
+            find "$SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "Using APK signer: $APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          echo "APK signature verification passed."
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.include_local_ai && 'emis-app-release-with-ai' || 'emis-app-release-no-ai' }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Disk diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Disk usage ==="
+          df -h /
+          echo "=== Largest build/cache directories ==="
+          du -sh "$HOME/.pub-cache" "$HOME/.gradle" "$ANDROID_SDK_ROOT" build 2>/dev/null || true

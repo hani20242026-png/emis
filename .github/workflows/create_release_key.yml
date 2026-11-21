@@ -1,0 +1,42 @@
+
+name: Create Permanent Release Key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-key:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate release key
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          test -n "$STORE_PASSWORD"
+
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/emis-release.jks" \
+            -storetype JKS \
+            -alias emis-release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
+            -dname "CN=EMIS Release, OU=Android, O=EMIS, L=Diwaniyah, ST=Iraq, C=IQ"
+
+          base64 -w 0 "$RUNNER_TEMP/emis-release.jks" \
+            > "$RUNNER_TEMP/ANDROID_KEYSTORE_BASE64.txt"
+
+      - name: Upload temporary key export
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-release-key-export
+          path: ${{ runner.temp }}/ANDROID_KEYSTORE_BASE64.txt
+          retention-days: 1

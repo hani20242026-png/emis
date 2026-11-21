@@ -1,0 +1,21 @@
+# Flutter-related build artifacts
+flutter/ephemeral/
+flutter/flutter_plugins.cmake
+flutter/flutter_plugins_dependencies.cmake
+flutter/generated_plugin_registrant.cc
+flutter/generated_plugin_registrant.h
+
+# Visual Studio / CMake build directories
+build/
+out/
+*.dir/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_CPack_Packages/

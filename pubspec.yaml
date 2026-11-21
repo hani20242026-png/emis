@@ -1,0 +1,66 @@
+name: iraq_emis
+description: A new Flutter project for Iraq EMIS System.
+
+publish_to: 'none'
+
+version: 1.0.0+18
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  excel: ^4.0.6
+  path_provider: ^2.1.5
+  share_plus: ^10.1.4
+  webview_flutter: ^4.4.2
+  webview_windows: ^0.4.0
+  audioplayers: ^6.8.1
+  video_player: ^2.8.2
+
+  # الكاميرا والمعرض واختيار الملفات على سطح المكتب
+  image_picker: ^1.0.7
+  file_picker: ^8.1.2
+
+  # صلاحيات الكاميرا والملفات وغيرها
+  speech_to_text: ^7.4.0
+  permission_handler: ^11.3.0
+
+  # التخزين المحلي
+  shared_preferences: ^2.2.2
+
+  # معالجة الصور
+  image: ^4.3.0
+
+  # إزالة خلفية الشخص محليًا (تُزال تلقائياً في مسار بناء Windows)
+  google_mlkit_selfie_segmentation: 0.12.1
+
+  # مكتبة الرسوم المتحركة Lottie
+  lottie: ^3.1.0
+
+  # التعرف الصوتي الأساسي عبر Android SpeechRecognizer، مع مسار speech_to_text احتياطي.
+  # تشغيل نموذج GGUF محلياً عبر llama.cpp؛ لا توجد خدمة استدلال سحابية.
+  llamafu: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/avatar.png
+    - assets/relax.mp3
+    - assets/intro.mp4
+    - assets/animations/emis_assistant_workplace.json
+    - assets/models/

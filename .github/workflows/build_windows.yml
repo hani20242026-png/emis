@@ -1,0 +1,227 @@
+name: Build Flutter Windows EXE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+# Use the Windows Server 2022 / Visual Studio 2022 toolchain.
+    # The newer VS 2026 MSVC in windows-2025 treats legacy <experimental/coroutine>
+    # usage in webview_windows 0.4.0 as a hard STL1011 error.
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop and download artifacts
+        shell: pwsh
+        run: |
+          flutter --version
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter is not available.' }
+
+          flutter config --enable-windows-desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Could not enable Windows desktop support.' }
+
+          flutter precache --windows
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download Flutter Windows artifacts.' }
+
+      - name: Clean previous build output
+        shell: pwsh
+        run: |
+          flutter clean
+          if ($LASTEXITCODE -ne 0) { throw 'flutter clean failed.' }
+
+          if (Test-Path 'build\windows') {
+            Remove-Item 'build\windows' -Recurse -Force
+          }
+
+      # Regenerate the Windows runner from the exact Flutter SDK used by this build.
+      # This runs only on the GitHub Actions checkout; it does not delete files in the repository.
+      - name: Regenerate Windows platform files
+        shell: pwsh
+        run: |
+          if (Test-Path 'windows') {
+            Remove-Item 'windows' -Recurse -Force
+          }
+
+          flutter create --platforms=windows .
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to regenerate the Windows platform.' }
+
+          $requiredFiles = @(
+            'windows\CMakeLists.txt',
+            'windows\flutter\CMakeLists.txt',
+            'windows\runner\CMakeLists.txt',
+            'windows\runner\main.cpp'
+          )
+
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Flutter did not generate required Windows file: $file"
+            }
+          }
+
+          Write-Host 'Windows platform files were regenerated successfully.'
+
+      - name: Resolve Flutter dependencies
+        shell: pwsh
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed.' }
+
+      - name: Prepare Local AI Windows stubs
+        shell: pwsh
+        run: |
+          $stubScript = 'scripts\stub_local_ai.py'
+          if (-not (Test-Path $stubScript)) {
+            throw "Required script not found: $stubScript"
+          }
+
+          python $stubScript
+          if ($LASTEXITCODE -ne 0) {
+            throw "Local AI Windows stub preparation failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Ensure Windows application icon exists
+        shell: pwsh
+        run: |
+          $icoPath = 'windows\runner\resources\appicon.ico'
+
+          if (-not (Test-Path $icoPath)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $icoPath) | Out-Null
+            Add-Type -AssemblyName System.Drawing
+
+            $sourcePng = @(
+              'assets\appicon.png',
+              'assets\icon.png',
+              'assets\logo.png'
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+            if ($sourcePng) {
+              $sourceBitmap = [System.Drawing.Bitmap]::FromFile((Resolve-Path $sourcePng).Path)
+              $bitmap = New-Object System.Drawing.Bitmap($sourceBitmap, 256, 256)
+              $sourceBitmap.Dispose()
+            }
+            else {
+              $bitmap = New-Object System.Drawing.Bitmap(256, 256)
+              $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+              $graphics.Clear([System.Drawing.Color]::FromArgb(255, 22, 26, 48))
+              $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 168, 85, 247), 12)
+              $graphics.DrawEllipse($pen, 28, 28, 200, 200)
+              $font = New-Object System.Drawing.Font('Segoe UI', 54, [System.Drawing.FontStyle]::Bold)
+              $format = New-Object System.Drawing.StringFormat
+              $format.Alignment = [System.Drawing.StringAlignment]::Center
+              $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+              $graphics.DrawString('EMIS', $font, [System.Drawing.Brushes]::White, [System.Drawing.RectangleF]::new(0, 0, 256, 256), $format)
+              $graphics.Dispose()
+              $pen.Dispose()
+              $font.Dispose()
+              $format.Dispose()
+            }
+
+            $pngStream = New-Object System.IO.MemoryStream
+            $bitmap.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)
+            $pngBytes = $pngStream.ToArray()
+            $pngStream.Dispose()
+            $bitmap.Dispose()
+
+            $fileStream = [System.IO.File]::Open($icoPath, [System.IO.FileMode]::Create)
+            $writer = New-Object System.IO.BinaryWriter($fileStream)
+            $writer.Write([UInt16]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]1)
+            $writer.Write([Byte]0)
+            $writer.Write([Byte]0)
+            $writer.Write([Byte]0)
+            $writer.Write([Byte]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]32)
+            $writer.Write([UInt32]$pngBytes.Length)
+            $writer.Write([UInt32]22)
+            $writer.Write($pngBytes)
+            $writer.Dispose()
+            $fileStream.Dispose()
+          }
+
+          if (-not (Test-Path $icoPath)) {
+            throw "Windows application icon could not be created: $icoPath"
+          }
+          Write-Host "Verified: $icoPath"
+
+      - name: Build Windows EXE
+        shell: pwsh
+        run: |
+          flutter build windows --release --dart-define=ENABLELOCALAI=false --verbose
+          $buildExitCode = $LASTEXITCODE
+
+          if ($buildExitCode -ne 0) {
+            Write-Host '----- windows/flutter contents -----'
+            if (Test-Path 'windows\flutter') {
+              Get-ChildItem 'windows\flutter' -Force -Recurse |
+                Select-Object -First 150 FullName, Length |
+                Format-Table -AutoSize
+            }
+
+            Write-Host '----- windows/flutter/CMakeLists.txt -----'
+            if (Test-Path 'windows\flutter\CMakeLists.txt') {
+              Get-Content 'windows\flutter\CMakeLists.txt'
+            }
+
+            throw "flutter build windows failed with exit code $buildExitCode"
+          }
+
+      - name: Verify Windows release output
+        shell: pwsh
+        run: |
+          $releaseDir = 'build\windows\x64\runner\Release'
+          if (-not (Test-Path $releaseDir)) {
+            throw "Windows release directory was not found: $releaseDir"
+          }
+
+          $exe = Get-ChildItem $releaseDir -Filter '*.exe' -File | Select-Object -First 1
+          if (-not $exe) {
+            throw "No EXE file was produced in $releaseDir"
+          }
+
+          Write-Host "Created executable: $($exe.FullName)"
+          Get-ChildItem $releaseDir -Recurse -File |
+            Measure-Object -Property Length -Sum |
+            ForEach-Object { Write-Host "Release files: $($_.Count); total bytes: $($_.Sum)" }
+
+      - name: Package Windows application
+        shell: pwsh
+        run: |
+          $releaseDir = 'build\windows\x64\runner\Release'
+          $zipPath = 'iraq_emis_windows_exe.zip'
+
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath $zipPath -CompressionLevel Optimal
+
+          if (-not (Test-Path $zipPath)) {
+            throw 'Windows ZIP package was not created.'
+          }
+          Write-Host "Package created: $zipPath"
+
+      - name: Upload Windows EXE package
+        uses: actions/upload-artifact@v4
+        with:
+          name: iraq-emis-windows-exe
+          path: iraq_emis_windows_exe.zip
+          if-no-files-found: error
+          retention-days: 14

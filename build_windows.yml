@@ -1,0 +1,133 @@
+name: Build Flutter Windows EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter and enable Windows desktop
+        shell: pwsh
+        run: |
+          flutter --version
+          flutter config --enable-windows-desktop
+          flutter precache --windows
+
+      # IMPORTANT: clean BEFORE recreating Windows scaffolding.
+      # flutter clean deletes windows/flutter/ephemeral, so never run it after
+      # flutter create or manually delete ephemeral afterward.
+      - name: Clean old build artifacts
+        shell: pwsh
+        run: |
+          flutter clean
+          if ($LASTEXITCODE -ne 0) {
+            throw "flutter clean failed with exit code $LASTEXITCODE"
+          }
+          if (Test-Path "build\windows") {
+            Remove-Item -Recurse -Force "build\windows"
+          }
+
+      - name: Regenerate Windows platform scaffolding
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows .
+          if ($LASTEXITCODE -ne 0) {
+            throw "flutter create failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Get Flutter dependencies
+        shell: pwsh
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) {
+            throw "flutter pub get failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Verify generated Windows CMake files
+        shell: pwsh
+        run: |
+          $flutterCmake = "windows\flutter\CMakeLists.txt"
+          $ephemeralCmake = "windows\flutter\ephemeral\CMakeLists.txt"
+
+          if (-not (Test-Path $flutterCmake)) {
+            throw "Missing $flutterCmake"
+          }
+
+          if (-not (Test-Path $ephemeralCmake)) {
+            Write-Host "Windows Flutter directory contents:"
+            Get-ChildItem "windows\flutter" -Force -Recurse |
+              Select-Object -First 100 FullName
+            throw "Flutter did not generate $ephemeralCmake. Build stopped before CMake."
+          }
+
+          Write-Host "Verified: $flutterCmake"
+          Write-Host "Verified: $ephemeralCmake"
+
+      - name: Disable unsupported local LLM runtime for Windows
+        shell: pwsh
+        run: |
+          python scripts/stub_local_ai.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "Local AI Windows stub preparation failed"
+          }
+
+      - name: Verify Windows application icon
+        shell: pwsh
+        run: |
+          $icoPath = "windows\runner\resources\app_icon.ico"
+          if (-not (Test-Path $icoPath)) {
+            throw "Missing Windows icon: $icoPath"
+          }
+
+      - name: Build Windows Release EXE
+        shell: pwsh
+        run: |
+          flutter build windows --release --dart-define=ENABLE_LOCAL_AI=false --verbose
+          if ($LASTEXITCODE -ne 0) {
+            throw "flutter build windows failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Package Windows Release bundle
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\x64\runner\Release"
+          if (-not (Test-Path $releaseDir)) {
+            $releaseDir = "build\windows\runner\Release"
+          }
+          if (-not (Test-Path $releaseDir)) {
+            throw "Windows Release output directory was not created."
+          }
+
+          $exe = Get-ChildItem -Path $releaseDir -Filter "*.exe" -File |
+            Select-Object -First 1
+          if (-not $exe) {
+            throw "No EXE file was found in $releaseDir"
+          }
+
+          $pkgDir = "windows_exe_package"
+          if (Test-Path $pkgDir) {
+            Remove-Item -Recurse -Force $pkgDir
+          }
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          Copy-Item -Path "$releaseDir\*" -Destination $pkgDir -Recurse -Force
+          Compress-Archive -Path "$pkgDir\*" `
+            -DestinationPath "iraq_emis_windows_exe.zip" -Force
+
+      - name: Upload Windows EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iraq-emis-windows-exe
+          path: iraq_emis_windows_exe.zip
+          if-no-files-found: error
