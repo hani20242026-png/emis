@@ -24,6 +24,66 @@ class GoogleSpeechService {
   static final SpeechToText _desktopStt = SpeechToText();
   static bool _desktopInitialized = false;
   static int? _desktopSessionId;
+  static String? _desktopArabicLocaleId;
+  static String? _desktopLocaleError;
+
+  static String _normalizeLocaleId(String value) =>
+      value.trim().replaceAll('_', '-').toLowerCase();
+
+  /// Windows speech recognition only supports languages installed in Windows.
+  /// Never allow the recognizer to silently fall back to English.
+  static Future<String?> _resolveDesktopArabicLocale(String requested) async {
+    if (_desktopArabicLocaleId != null) return _desktopArabicLocaleId;
+
+    try {
+      final locales = await _desktopStt.locales();
+      final available = locales
+          .map((locale) => locale.localeId.trim())
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false);
+
+      final requestedNormalized = _normalizeLocaleId(requested);
+      String? selected;
+
+      for (final id in available) {
+        if (_normalizeLocaleId(id) == requestedNormalized) {
+          selected = id;
+          break;
+        }
+      }
+
+      // Iraqi Arabic is preferred. If Windows does not provide it, use an
+      // installed Arabic locale rather than accepting an English fallback.
+      if (selected == null) {
+        for (final id in available) {
+          if (_normalizeLocaleId(id).startsWith('ar-')) {
+            selected = id;
+            break;
+          }
+        }
+      }
+
+      if (selected == null) {
+        _desktopLocaleError =
+            'لا توجد حزمة تعرف صوتي باللغة العربية مثبتة في Windows. '
+            'أضف اللغة العربية مع ميزة Speech recognition من إعدادات Windows.';
+        return null;
+      }
+
+      _desktopArabicLocaleId = selected;
+      _desktopLocaleError = null;
+      return selected;
+    } catch (error) {
+      _desktopLocaleError = 'تعذر قراءة لغات التعرف الصوتي المثبتة في Windows: $error';
+      return null;
+    }
+  }
+
+  static bool _containsLatinLetters(String value) =>
+      RegExp(r'[A-Za-z]').hasMatch(value);
+
+  static bool _containsArabicLetters(String value) =>
+      RegExp(r'[\u0600-\u06FF]').hasMatch(value);
 
   static bool get _useDesktopSpeech =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -161,13 +221,27 @@ class GoogleSpeechService {
             }
           },
         );
+        if (!_desktopInitialized) {
+          return <String, dynamic>{
+            'available': false,
+            'provider': 'Windows Speech',
+            'message': 'تعذر تشغيل خدمة التعرف الصوتي في Windows.',
+          };
+        }
+        final arabicLocale = await _resolveDesktopArabicLocale('ar-IQ');
         return <String, dynamic>{
-          'available': _desktopInitialized,
+          'available': arabicLocale != null,
           'frameworkAvailable': _desktopInitialized,
           'provider': 'Windows Speech',
+          'locale': arabicLocale,
+          if (_desktopLocaleError != null) 'message': _desktopLocaleError,
         };
-      } catch (_) {
-        return <String, dynamic>{'available': false, 'provider': 'Windows Speech'};
+      } catch (error) {
+        return <String, dynamic>{
+          'available': false,
+          'provider': 'Windows Speech',
+          'message': 'تعذر تهيئة التعرف الصوتي: $error',
+        };
       }
     }
 
@@ -218,36 +292,53 @@ class GoogleSpeechService {
           _activeSessionId = null;
           return false;
         }
+
+        final arabicLocale = await _resolveDesktopArabicLocale(locale);
+        if (arabicLocale == null) {
+          _activeSessionId = null;
+          _emitDesktopEvent('error', sessionId, {
+            'message': _desktopLocaleError ??
+                'لم يتم العثور على لغة عربية للتعرف الصوتي في Windows.',
+          });
+          return false;
+        }
+
         await _desktopStt.listen(
-          localeId: locale,
-          partialResults: true,
-          listenFor: Duration(
-            milliseconds: (completeSilenceMs ?? AppCore.voiceCompleteSilenceMs)
-                .clamp(3000, 90000),
-          ),
+          localeId: arabicLocale,
+          // Do not publish unstable partial hypotheses to form fields.
+          // Only a completed recognition result is allowed to update EMIS.
+          partialResults: false,
+          listenFor: const Duration(seconds: 30),
           pauseFor: Duration(
             milliseconds: (possibleSilenceMs ?? AppCore.voicePossibleSilenceMs)
-                .clamp(1000, 30000),
+                .clamp(1200, 5000),
           ),
           onResult: (SpeechRecognitionResult res) {
-            if (_desktopSessionId != sessionId) return;
+            if (_desktopSessionId != sessionId || !res.finalResult) return;
             final words = res.recognizedWords.trim();
+            if (words.isEmpty || _containsLatinLetters(words)) return;
+
+            // Ignore empty/noise hypotheses. Arabic words or numeric-only
+            // values are accepted; English fallback output is never inserted.
+            final hasArabic = _containsArabicLetters(words);
+            final hasDigits = RegExp(r'[0-9٠-٩۰-۹]').hasMatch(words);
+            if (!hasArabic && !hasDigits) return;
+
             final alts = res.alternates
                 .map((a) => a.recognizedWords.trim())
-                .where((w) => w.isNotEmpty)
+                .where((w) =>
+                    w.isNotEmpty &&
+                    !_containsLatinLetters(w) &&
+                    (_containsArabicLetters(w) ||
+                        RegExp(r'[0-9٠-٩۰-۹]').hasMatch(w)))
                 .toList(growable: false);
-            _emitDesktopEvent(
-              res.finalResult ? 'result' : 'partial',
-              sessionId,
-              {
-                'text': words,
-                'segment': words,
-                'alternates': alts.isEmpty && words.isNotEmpty ? <String>[words] : alts,
-                'segmentAlternates':
-                    alts.isEmpty && words.isNotEmpty ? <String>[words] : alts,
-                'isFinal': res.finalResult,
-              },
-            );
+            _emitDesktopEvent('result', sessionId, {
+              'text': words,
+              'segment': words,
+              'alternates': alts.isEmpty ? <String>[words] : alts,
+              'segmentAlternates': alts.isEmpty ? <String>[words] : alts,
+              'isFinal': true,
+            });
           },
         );
         return true;
