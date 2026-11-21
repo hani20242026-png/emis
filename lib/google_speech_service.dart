@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -26,6 +27,12 @@ class GoogleSpeechService {
   static int? _desktopSessionId;
   static String? _desktopArabicLocaleId;
   static String? _desktopLocaleError;
+  static HttpServer? _chromeSpeechServer;
+  static Process? _chromeSpeechProcess;
+  static String? _chromeSpeechExecutable;
+  static String? _chromeSpeechCommand;
+  static bool _chromeSpeechPageReady = false;
+  static Completer<void>? _chromeSpeechReady;
 
   static String _normalizeLocaleId(String value) =>
       value.trim().replaceAll('_', '-').toLowerCase();
@@ -85,15 +92,177 @@ class GoogleSpeechService {
   static bool _containsArabicLetters(String value) =>
       RegExp(r'[\u0600-\u06FF]').hasMatch(value);
 
+  static bool get _useWindowsChromeSpeech => Platform.isWindows;
+
   static bool get _useDesktopSpeech =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+      Platform.isLinux || Platform.isMacOS;
+
+  static Future<String?> _findChromeExecutable() async {
+    if (_chromeSpeechExecutable != null &&
+        await File(_chromeSpeechExecutable!).exists()) {
+      return _chromeSpeechExecutable;
+    }
+    final candidates = <String>[
+      if (Platform.environment['PROGRAMFILES'] != null)
+        '${Platform.environment['PROGRAMFILES']}\\Google\\Chrome\\Application\\chrome.exe',
+      if (Platform.environment['PROGRAMFILES(X86)'] != null)
+        '${Platform.environment['PROGRAMFILES(X86)']}\\Google\\Chrome\\Application\\chrome.exe',
+      if (Platform.environment['LOCALAPPDATA'] != null)
+        '${Platform.environment['LOCALAPPDATA']}\\Google\\Chrome\\Application\\chrome.exe',
+    ];
+    for (final path in candidates) {
+      if (await File(path).exists()) return _chromeSpeechExecutable = path;
+    }
+    for (final key in <String>[
+      r'HKCU\Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+      r'HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+      r'HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+    ]) {
+      try {
+        final result = await Process.run('reg', ['query', key, '/ve']);
+        final output = '${result.stdout}';
+        final match = RegExp(r'(?im)^\s*\(Default\)\s+REG_SZ\s+(.+chrome\.exe)\s*$')
+            .firstMatch(output);
+        final path = match?.group(1)?.trim();
+        if (path != null && await File(path).exists()) {
+          return _chromeSpeechExecutable = path;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  static String _chromeSpeechPage(String token) => r'''<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EMIS Voice Service</title>
+<style>html,body{margin:0;background:transparent;color:transparent;overflow:hidden}</style></head><body>
+<script>
+(()=>{
+const token=''' + jsonEncode(token) + r''';
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null, running=false, shouldRun=false, restarting=false, lastError='', serverFailures=0;
+async function send(type,text='',extra={}){try{await fetch('/event?token='+encodeURIComponent(token),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,text,...extra})});}catch(e){}}
+async function poll(){try{const r=await fetch('/control?token='+encodeURIComponent(token),{cache:'no-store'});if(!r.ok)throw new Error('server');serverFailures=0;const c=await r.json();if(c.action==='start'&&!shouldRun){shouldRun=true;start();}else if(c.action==='stop'&&shouldRun){shouldRun=false;try{rec&&rec.stop();}catch(e){}}}catch(e){serverFailures++;if(serverFailures>12){try{shouldRun=false;rec&&rec.stop();window.close();}catch(_){}return;}}setTimeout(poll,250);}
+function start(){if(!SR){send('error','هذا الإصدار من Chrome لا يدعم التعرف الصوتي.');return;}if(!rec){rec=new SR();rec.lang='ar-KW';rec.continuous=true;rec.interimResults=false;rec.maxAlternatives=3;
+rec.onstart=()=>{running=true;send('ready','');};
+rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const item=e.results[i];if(!item.isFinal)continue;const text=(item[0]?.transcript||'').trim();if(text)send('result',text,{alternates:Array.from(item).slice(1).map(x=>x.transcript).filter(Boolean)});}};
+rec.onerror=e=>{lastError=e.error||'unknown';send('error',lastError);};
+rec.onend=()=>{running=false;if(shouldRun){setTimeout(()=>{if(shouldRun&&!running){try{restarting=true;rec.start();}catch(e){send('error',String(e));}}},700);}else send('stopped','');};}
+try{rec.start();}catch(e){if(!restarting)send('error',String(e));}restarting=false;}
+send('page-ready','');
+poll();
+})();
+</script></body></html>''';
+
+  static Future<bool> _ensureChromeSpeechServer() async {
+    if (_chromeSpeechServer != null && _chromeSpeechProcess != null) return true;
+    final chrome = await _findChromeExecutable();
+    if (chrome == null) {
+      _emitDesktopEvent('error', _activeSessionId, {
+        'message': 'لم يتم العثور على Google Chrome. يرجى تثبيت Chrome ثم إعادة المحاولة.',
+      });
+      return false;
+    }
+    final appData = Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
+    final profile = Directory('$appData\\EMIS\\ChromeSpeechProfile');
+    await profile.create(recursive: true);
+    final permissionMarker = File('${profile.path}\\microphone-permission-granted.marker');
+    final permissionWasGranted = await permissionMarker.exists();
+    final token = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _chromeSpeechServer = server;
+    _chromeSpeechCommand = 'idle';
+    _chromeSpeechPageReady = false;
+    _chromeSpeechReady = Completer<void>();
+    server.listen((request) async {
+      request.response.headers
+        ..set(HttpHeaders.cacheControlHeader, 'no-store')
+        ..set(HttpHeaders.accessControlAllowOriginHeader, '*');
+      final queryToken = request.uri.queryParameters['token'];
+      if (queryToken != token) {
+        request.response.statusCode = HttpStatus.forbidden;
+        await request.response.close();
+        return;
+      }
+      if (request.method == 'GET' && request.uri.path == '/') {
+        request.response.headers.contentType = ContentType.html;
+        request.response.write(_chromeSpeechPage(token));
+      } else if (request.method == 'GET' && request.uri.path == '/control') {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'action': _chromeSpeechCommand}));
+      } else if (request.method == 'POST' && request.uri.path == '/event') {
+        final body = await utf8.decoder.bind(request).join();
+        try {
+          final event = jsonDecode(body) as Map<String, dynamic>;
+          final type = '${event['type'] ?? ''}';
+          final text = '${event['text'] ?? ''}';
+          if (type == 'page-ready') {
+            _chromeSpeechPageReady = true;
+            if (!(_chromeSpeechReady?.isCompleted ?? true)) _chromeSpeechReady!.complete();
+          }
+          if (type == 'ready') {
+            if (!permissionMarker.existsSync()) {
+              try { permissionMarker.writeAsStringSync('granted'); } catch (_) {}
+            }
+            if (!(_chromeSpeechReady?.isCompleted ?? true)) _chromeSpeechReady!.complete();
+          }
+          if (_activeSessionId != null &&
+              (type == 'ready' || type == 'stopped' || type == 'error' || type == 'result')) {
+            _emitDesktopEvent(type, _activeSessionId, {
+              'text': text,
+              'segment': text,
+              'isFinal': type == 'result',
+              'alternates': (event['alternates'] is List) ? event['alternates'] : <String>[],
+              if (type == 'error') 'message': text,
+            });
+          }
+        } catch (_) {}
+        request.response.headers.contentType = ContentType.json;
+        request.response.write('{"ok":true}');
+      } else {
+        request.response.statusCode = HttpStatus.notFound;
+      }
+      await request.response.close();
+    }, onError: (Object error) {
+      _emitDesktopEvent('error', _activeSessionId, {'message': '$error'});
+    });
+    final url = 'http://127.0.0.1:${server.port}/?token=$token';
+    try {
+      _chromeSpeechProcess = await Process.start(chrome, [
+        '--no-first-run', '--no-default-browser-check', '--disable-background-mode',
+        '--disable-session-crashed-bubble', '--noerrdialogs',
+        '--user-data-dir=${profile.path}', '--new-window', '--app=$url',
+        if (permissionWasGranted) '--window-position=-32000,-32000',
+        '--window-size=900,650',
+      ], mode: ProcessStartMode.detached);
+    } catch (error) {
+      await server.close(force: true);
+      _chromeSpeechServer = null;
+      _chromeSpeechProcess = null;
+      _emitDesktopEvent('error', _activeSessionId, {'message': 'تعذر تشغيل Chrome: $error'});
+      return false;
+    }
+    // First run is visible so the user can explicitly approve microphone access.
+    // Once Chrome reports listening, later launches can stay off-screen.
+    try {
+      await _chromeSpeechReady!.future.timeout(const Duration(seconds: 25));
+    } on TimeoutException {
+      await server.close(force: true);
+      _chromeSpeechServer = null;
+      _chromeSpeechProcess = null;
+      _emitDesktopEvent('error', _activeSessionId, {
+        'message': 'لم يبدأ Chrome خدمة الميكروفون خلال المهلة. تحقق من إذن الميكروفون في Chrome.',
+      });
+      return false;
+    }
+    return true;
+  }
 
   static int nextSessionId() => ++_globalSessionCounter;
 
   static int? get activeSessionId => _activeSessionId;
 
   static void _ensurePlatformStreamSubscribed() {
-    if (_useDesktopSpeech) return;
+    if (_useDesktopSpeech || _useWindowsChromeSpeech) return;
     if (_platformSubscription != null) return;
     _platformSubscription = _events.receiveBroadcastStream().listen(
       (event) {
@@ -185,7 +354,7 @@ class GoogleSpeechService {
   }
 
   static Stream<Map<String, dynamic>> get events {
-    if (!_useDesktopSpeech) {
+    if (!_useDesktopSpeech && !_useWindowsChromeSpeech) {
       _ensurePlatformStreamSubscribed();
     }
     return _eventsController.stream;
@@ -203,6 +372,15 @@ class GoogleSpeechService {
   }
 
   static Future<Map<String, dynamic>> getInfo() async {
+    if (_useWindowsChromeSpeech) {
+      final chrome = await _findChromeExecutable();
+      return <String, dynamic>{
+        'available': chrome != null,
+        'provider': 'Google Chrome Speech',
+        'locale': 'ar-KW',
+        if (chrome == null) 'message': 'لم يتم العثور على Google Chrome في هذا الجهاز.',
+      };
+    }
     if (_useDesktopSpeech) {
       try {
         _desktopInitialized = await _desktopStt.initialize(
@@ -264,6 +442,13 @@ class GoogleSpeechService {
     await AppCore.ensureLoaded();
     _activeSessionId = sessionId;
 
+    if (_useWindowsChromeSpeech) {
+      final ready = await _ensureChromeSpeechServer();
+      if (!ready) { _activeSessionId = null; return false; }
+      _chromeSpeechCommand = 'start';
+      return true;
+    }
+
     if (_useDesktopSpeech) {
       _desktopSessionId = sessionId;
       try {
@@ -274,7 +459,7 @@ class GoogleSpeechService {
               _emitDesktopEvent('error', sessionId, {
                 'message': err.errorMsg.isNotEmpty
                     ? err.errorMsg
-                    : 'تعذر التعرف على الكلام على Windows.',
+                    : 'تعذر التعرف على الكلام على سطح المكتب.',
               });
             },
             onStatus: (String status) {
@@ -369,7 +554,7 @@ class GoogleSpeechService {
     String? fieldKey,
     String? fieldType,
   }) async {
-    if (_useDesktopSpeech) return;
+    if (_useDesktopSpeech || _useWindowsChromeSpeech) return;
     try {
       await _method.invokeMethod<dynamic>(
         'updateSettings',
@@ -379,6 +564,13 @@ class GoogleSpeechService {
   }
 
   static Future<void> stopListening() async {
+    if (_useWindowsChromeSpeech) {
+      final session = _activeSessionId;
+      _chromeSpeechCommand = 'stop';
+      _activeSessionId = null;
+      _emitDesktopEvent('stopped', session, {});
+      return;
+    }
     if (_useDesktopSpeech) {
       try {
         await _desktopStt.stop();
@@ -391,7 +583,13 @@ class GoogleSpeechService {
   }
 
   static Future<void> cancelListening() async {
-    _activeSessionId = null;
+    if (_useWindowsChromeSpeech) {
+      final session = _activeSessionId;
+      _activeSessionId = null;
+      _chromeSpeechCommand = 'stop';
+      _emitDesktopEvent('stopped', session, {});
+      return;
+    }
     if (_useDesktopSpeech) {
       try {
         await _desktopStt.cancel();
@@ -406,7 +604,10 @@ class GoogleSpeechService {
     if (sessionId == null || _activeSessionId != sessionId) return;
     _activeSessionId = null;
     try {
-      if (_useDesktopSpeech) {
+      if (_useWindowsChromeSpeech) {
+        _chromeSpeechCommand = 'stop';
+        _emitDesktopEvent('stopped', sessionId, {});
+      } else if (_useDesktopSpeech) {
         await _desktopStt.cancel();
         _emitDesktopEvent('stopped', sessionId, {});
       } else {
