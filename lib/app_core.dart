@@ -8,6 +8,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'google_speech_service.dart';
 
 class AppCore {
+  /// Desktop fallback for devices/drivers where Flutter shader gradients are
+  /// not composited correctly. Mobile rendering keeps the original gradients.
+  static bool get isWindows => Platform.isWindows;
+
+  static Color? windowsGradientFallback(Gradient? gradient) {
+    if (gradient == null) return null;
+    if (gradient is RadialGradient) {
+      return gradient.colors.first.withOpacity(0.16);
+    }
+    if (gradient is SweepGradient) {
+      return gradient.colors.first;
+    }
+    if (gradient is LinearGradient) {
+      return gradient.colors.first;
+    }
+    return Colors.transparent;
+  }
+
   static SharedPreferences? _preferences;
 
   /// SharedPreferences cache used by screens that read lightweight feature flags[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span).

@@ -455,9 +455,12 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -478,7 +481,7 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -497,6 +500,25 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF27171C),
+                      Color(0xFF161A30),
+                      Color(0xFF241734),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFFFF7ED),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: (isDark ? orangeNeon : purpleNeon).withOpacity(isDark ? 0.45 : 0.30),
@@ -599,7 +621,7 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -612,6 +634,19 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
                   const Color(0xFFFFF7ED).withOpacity(0.92),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  const Color(0xFF1E172A).withOpacity(0.90),
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  const Color(0xFFFFF7ED).withOpacity(0.92),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: orangeNeon.withOpacity(isDark ? 0.45 : 0.32),
@@ -774,7 +809,7 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
         duration: const Duration(milliseconds: 200),
         height: 56,
         decoration: BoxDecoration(
-          gradient: (_isWorking || isEmpty)
+          gradient: AppCore.isWindows ? null : (_isWorking || isEmpty)
               ? LinearGradient(
                   colors: [Colors.grey.shade700, Colors.grey.shade600],
                 )
@@ -783,6 +818,15 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
                   end: Alignment.bottomLeft,
                   colors: [orangeNeon, goldNeon],
                 ),
+          color: AppCore.isWindows ? AppCore.windowsGradientFallback((_isWorking || isEmpty)
+              ? LinearGradient(
+                  colors: [Colors.grey.shade700, Colors.grey.shade600],
+                )
+              : const LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [orangeNeon, goldNeon],
+                )) : null,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: Colors.white.withOpacity(0.35),
@@ -879,7 +923,7 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -896,6 +940,23 @@ class _AARemovalToolScreenState extends State<AARemovalToolScreen>
                   Color.lerp(const Color(0xFFF8FAFC), statusColor, 0.04)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), statusColor, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Color.lerp(const Color(0xFFF8FAFC), statusColor, 0.04)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: statusColor.withOpacity(isDark ? 0.45 : 0.30),
@@ -1212,7 +1273,7 @@ class _AnimatedToolOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -1220,6 +1281,14 @@ class _AnimatedToolOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

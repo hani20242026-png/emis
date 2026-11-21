@@ -1,3 +1,4 @@
+import 'app_core.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -165,7 +166,7 @@ class _EmisStudentAnimationState extends State<EmisStudentAnimation>
           height: h,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: AppCore.isWindows ? null : LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
@@ -174,6 +175,15 @@ class _EmisStudentAnimationState extends State<EmisStudentAnimation>
                 Color.lerp(color, Colors.black, .12)!,
               ],
             ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(color, Colors.white, .32)!,
+                color,
+                Color.lerp(color, Colors.black, .12)!,
+              ],
+            )) : null,
             borderRadius: BorderRadius.circular(11),
             border: Border.all(
               color: Colors.white.withOpacity(active ? .65 : .22),

@@ -206,9 +206,12 @@ class _DeactivatedStudentsScreenState extends State<DeactivatedStudentsScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -227,7 +230,7 @@ class _DeactivatedStudentsScreenState extends State<DeactivatedStudentsScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -246,6 +249,25 @@ class _DeactivatedStudentsScreenState extends State<DeactivatedStudentsScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF27171C),
+                      Color(0xFF161A30),
+                      Color(0xFF241734),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFFFF1F2),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: (isDark ? redNeon : purpleNeon)
@@ -523,7 +545,7 @@ class _DeactivatedStudentsScreenState extends State<DeactivatedStudentsScreen>
                                             margin: const EdgeInsets.only(
                                                 bottom: 10),
                                             decoration: BoxDecoration(
-                                              gradient: isDark
+                                              gradient: AppCore.isWindows ? null : isDark
                                                   ? LinearGradient(
                                                       begin: Alignment.topLeft,
                                                       end: Alignment
@@ -551,6 +573,34 @@ class _DeactivatedStudentsScreenState extends State<DeactivatedStudentsScreen>
                                                             0.03)!,
                                                       ],
                                                     ),
+                                              color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                                                  ? LinearGradient(
+                                                      begin: Alignment.topLeft,
+                                                      end: Alignment
+                                                          .bottomRight,
+                                                      colors: [
+                                                        const Color(0xFF141829)
+                                                            .withOpacity(0.95),
+                                                        Color.lerp(
+                                                            const Color(
+                                                                0xFF0F1322),
+                                                            redNeon,
+                                                            0.07)!,
+                                                      ],
+                                                    )
+                                                  : LinearGradient(
+                                                      begin: Alignment.topLeft,
+                                                      end: Alignment
+                                                          .bottomRight,
+                                                      colors: [
+                                                        Colors.white,
+                                                        Color.lerp(
+                                                            const Color(
+                                                                0xFFF8FAFC),
+                                                            redNeon,
+                                                            0.03)!,
+                                                      ],
+                                                    )) : null,
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                               border: Border.all(
@@ -683,7 +733,7 @@ class _AnimatedDeactivatedOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -691,6 +741,14 @@ class _AnimatedDeactivatedOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

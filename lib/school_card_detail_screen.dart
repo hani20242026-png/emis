@@ -1686,7 +1686,8 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [color, color.withOpacity(0.0)]),
+          gradient: AppCore.isWindows ? null : RadialGradient(colors: [color, color.withOpacity(0.0)]),
+          color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(colors: [color, color.withOpacity(0.0)])) : null,
         ),
       );
 
@@ -1763,7 +1764,7 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? const LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
@@ -1774,6 +1775,17 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
                 end: Alignment.bottomLeft,
                 colors: [Color(0xFFFFFFFF), Color(0xFFF3F6FC), Color(0xFFEDE9FE)],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFF112A2E), Color(0xFF161A30), Color(0xFF241734)],
+              )
+            : const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFFFFFFFF), Color(0xFFF3F6FC), Color(0xFFEDE9FE)],
+              )) : null,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: isDark ? _emerald.withOpacity(0.45) : _purple.withOpacity(0.28),
@@ -1795,11 +1807,14 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
                 width: 58,
                 height: 58,
                 padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
+                  gradient: AppCore.isWindows ? null : LinearGradient(
                     colors: [Color(0xFFA855F7), Color(0xFF6366F1), Color(0xFF3B82F6)],
                   ),
+                  color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                    colors: [Color(0xFFA855F7), Color(0xFF6366F1), Color(0xFF3B82F6)],
+                  )) : null,
                 ),
                 child: ClipOval(
                   child: Container(
@@ -1963,9 +1978,12 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                gradient: active
+                gradient: AppCore.isWindows ? null : active
                     ? const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF6366F1)])
                     : null,
+                color: AppCore.isWindows ? AppCore.windowsGradientFallback(active
+                    ? const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF6366F1)])
+                    : null) : null,
                 color: active ? null : (isDark ? const Color(0xFF141829) : Colors.white),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(

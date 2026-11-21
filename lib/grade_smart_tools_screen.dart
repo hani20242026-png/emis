@@ -48,9 +48,12 @@ class _GradeSmartToolsScreenState extends State<GradeSmartToolsScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -70,7 +73,7 @@ class _GradeSmartToolsScreenState extends State<GradeSmartToolsScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -89,6 +92,25 @@ class _GradeSmartToolsScreenState extends State<GradeSmartToolsScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF112A2E),
+                      Color(0xFF161A30),
+                      Color(0xFF241734),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF3F6FC),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: (isDark ? blueNeon : purpleNeon)
@@ -315,7 +337,7 @@ class _AnimatedToolsOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -323,6 +345,14 @@ class _AnimatedToolsOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

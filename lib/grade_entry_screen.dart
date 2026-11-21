@@ -579,7 +579,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
     return Container(
       margin: const EdgeInsets.only(top: 12, bottom: 6),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -592,6 +592,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                   const Color(0xFFF8FAFC).withOpacity(0.92),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), purpleNeon, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  const Color(0xFFF8FAFC).withOpacity(0.92),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: purpleNeon.withOpacity(isDark ? 0.40 : 0.28),
@@ -644,7 +657,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
       margin: const EdgeInsets.only(top: 6, bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -657,6 +670,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                   Color.lerp(Colors.white, goldNeon, 0.08)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF1E1732), goldNeon, 0.12)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  const Color(0xFFFFFBEB),
+                  Color.lerp(Colors.white, goldNeon, 0.08)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: goldNeon.withOpacity(isDark ? 0.50 : 0.40),
@@ -1180,7 +1206,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
     return Container(
       margin: const EdgeInsets.only(top: 12, bottom: 6),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -1193,6 +1219,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                   const Color(0xFFF8FAFC).withOpacity(0.92),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), purpleNeon, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  const Color(0xFFF8FAFC).withOpacity(0.92),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: purpleNeon.withOpacity(isDark ? 0.40 : 0.28),
@@ -1513,9 +1552,12 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -1534,7 +1576,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -1553,6 +1595,25 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF221535),
+                      Color(0xFF161A30),
+                      Color(0xFF112A2E),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF5F3FF),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: purpleNeon.withOpacity(isDark ? 0.50 : 0.32),
@@ -1762,7 +1823,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              gradient: isDark
+                              gradient: AppCore.isWindows ? null : isDark
                                   ? const LinearGradient(
                                       colors: [
                                         Color(0xFF141829),
@@ -1775,6 +1836,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                                         Color(0xFFF8FAFC),
                                       ],
                                     ),
+                              color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                                  ? const LinearGradient(
+                                      colors: [
+                                        Color(0xFF141829),
+                                        Color(0xFF1E1732),
+                                      ],
+                                    )
+                                  : const LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFFFFF),
+                                        Color(0xFFF8FAFC),
+                                      ],
+                                    )) : null,
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
                                 color: purpleNeon.withOpacity(
@@ -2003,7 +2077,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -2016,6 +2090,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                   const Color(0xFFF8FAFC).withOpacity(0.92),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), purpleNeon, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  const Color(0xFFF8FAFC).withOpacity(0.92),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: purpleNeon.withOpacity(isDark ? 0.40 : 0.28),
@@ -2092,7 +2179,7 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 9),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -2105,6 +2192,19 @@ class _GradeEntryScreenState extends State<GradeEntryScreen>
                   Color.lerp(const Color(0xFFF8FAFC), blueNeon, 0.03)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), blueNeon, 0.06)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  Color.lerp(const Color(0xFFF8FAFC), blueNeon, 0.03)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: blueNeon.withOpacity(isDark ? 0.35 : 0.22),
@@ -2281,7 +2381,7 @@ class _AnimatedGradeEntryOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -2289,6 +2389,14 @@ class _AnimatedGradeEntryOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

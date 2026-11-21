@@ -46,9 +46,12 @@ class _EmployeeSmartToolsScreenState extends State<EmployeeSmartToolsScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -67,7 +70,7 @@ class _EmployeeSmartToolsScreenState extends State<EmployeeSmartToolsScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -86,6 +89,25 @@ class _EmployeeSmartToolsScreenState extends State<EmployeeSmartToolsScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF221535),
+                      Color(0xFF161A30),
+                      Color(0xFF112A2E),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF5F3FF),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: purpleNeon.withOpacity(isDark ? 0.50 : 0.32),
@@ -287,7 +309,7 @@ class _EmployeeSmartToolsScreenState extends State<EmployeeSmartToolsScreen>
 
     return Container(
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -304,6 +326,23 @@ class _EmployeeSmartToolsScreenState extends State<EmployeeSmartToolsScreen>
                   Color.lerp(const Color(0xFFF8FAFC), accentColor, 0.04)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), accentColor, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  Color.lerp(const Color(0xFFF8FAFC), accentColor, 0.04)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: accentColor.withOpacity(isDark ? 0.45 : 0.30),
@@ -432,7 +471,7 @@ class _AnimatedEmployeeToolsOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -440,6 +479,14 @@ class _AnimatedEmployeeToolsOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

@@ -399,9 +399,12 @@ class _StudentDistributionScreenState
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -421,7 +424,7 @@ class _StudentDistributionScreenState
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -440,6 +443,25 @@ class _StudentDistributionScreenState
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF112A2E),
+                      Color(0xFF161A30),
+                      Color(0xFF241734),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF3F6FC),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: (isDark ? blueNeon : purpleNeon)
@@ -614,7 +636,7 @@ class _StudentDistributionScreenState
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                gradient: dark
+                                gradient: AppCore.isWindows ? null : dark
                                     ? const LinearGradient(
                                         colors: [
                                           Color(0xFF141829),
@@ -627,6 +649,19 @@ class _StudentDistributionScreenState
                                           Color(0xFFF8FAFC),
                                         ],
                                       ),
+                                color: AppCore.isWindows ? AppCore.windowsGradientFallback(dark
+                                    ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFF141829),
+                                          Color(0xFF1E1732),
+                                        ],
+                                      )
+                                    : const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFFFFFF),
+                                          Color(0xFFF8FAFC),
+                                        ],
+                                      )) : null,
                                 borderRadius: BorderRadius.circular(22),
                                 border: Border.all(
                                   color: emeraldNeon.withOpacity(
@@ -808,7 +843,7 @@ class _StudentDistributionScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        gradient: dark
+        gradient: AppCore.isWindows ? null : dark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -821,6 +856,19 @@ class _StudentDistributionScreenState
                   const Color(0xFFF8FAFC).withOpacity(0.92),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(dark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), emeraldNeon, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  const Color(0xFFF8FAFC).withOpacity(0.92),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: emeraldNeon.withOpacity(dark ? 0.40 : 0.28),
@@ -918,7 +966,7 @@ class _StudentDistributionScreenState
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        gradient: dark
+        gradient: AppCore.isWindows ? null : dark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.95),
@@ -931,6 +979,19 @@ class _StudentDistributionScreenState
                   Color.lerp(const Color(0xFFF8FAFC), blueNeon, 0.03)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(dark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0F1322), blueNeon, 0.06)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  Color.lerp(const Color(0xFFF8FAFC), blueNeon, 0.03)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: (checked ? emeraldNeon : blueNeon).withOpacity(dark ? 0.35 : 0.22),
@@ -1049,7 +1110,7 @@ class _AnimatedDistributionOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -1057,6 +1118,14 @@ class _AnimatedDistributionOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

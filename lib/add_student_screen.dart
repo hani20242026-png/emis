@@ -2186,7 +2186,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
         margin: const EdgeInsets.only(top: 12, bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          gradient: isDark
+          gradient: AppCore.isWindows ? null : isDark
               ? LinearGradient(
                   colors: [
                     const Color(0xFF141829).withOpacity(0.95),
@@ -2199,6 +2199,19 @@ class _AddStudentScreenState extends State<AddStudentScreen>
                     Color.lerp(const Color(0xFFF8FAFC), emeraldNeon, 0.05)!,
                   ],
                 ),
+          color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+              ? LinearGradient(
+                  colors: [
+                    const Color(0xFF141829).withOpacity(0.95),
+                    Color.lerp(const Color(0xFF0F1322), emeraldNeon, 0.10)!,
+                  ],
+                )
+              : LinearGradient(
+                  colors: [
+                    Colors.white,
+                    Color.lerp(const Color(0xFFF8FAFC), emeraldNeon, 0.05)!,
+                  ],
+                )) : null,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: (enabled ? emeraldNeon : goldNeon)
@@ -2587,7 +2600,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -2604,6 +2617,23 @@ class _AddStudentScreenState extends State<AddStudentScreen>
                   Color.lerp(const Color(0xFFF8FAFC), accentColor, 0.04)!,
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.95),
+                  Color.lerp(const Color(0xFF0E1220), accentColor, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.96),
+                  Color.lerp(const Color(0xFFF8FAFC), accentColor, 0.04)!,
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: accentColor.withOpacity(isDark ? 0.45 : 0.30),
@@ -2969,9 +2999,12 @@ class _AddStudentScreenState extends State<AddStudentScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -2990,7 +3023,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -3009,6 +3042,25 @@ class _AddStudentScreenState extends State<AddStudentScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF112A2E),
+                      Color(0xFF161A30),
+                      Color(0xFF241734),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF3F6FC),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: (isDark ? emeraldNeon : purpleNeon)
@@ -3780,7 +3832,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
           duration: const Duration(milliseconds: 200),
           height: 58,
           decoration: BoxDecoration(
-            gradient: disabled
+            gradient: AppCore.isWindows ? null : disabled
                 ? LinearGradient(
                     colors: [
                       Colors.grey.shade700,
@@ -3795,6 +3847,21 @@ class _AddStudentScreenState extends State<AddStudentScreen>
                       blueNeon,
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(disabled
+                ? LinearGradient(
+                    colors: [
+                      Colors.grey.shade700,
+                      Colors.grey.shade600,
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      emeraldNeon,
+                      blueNeon,
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: Colors.white.withOpacity(0.35),
@@ -4369,7 +4436,7 @@ class _AnimatedStudentOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -4377,6 +4444,14 @@ class _AnimatedStudentOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

@@ -1367,9 +1367,12 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
+        gradient: AppCore.isWindows ? null : RadialGradient(
           colors: [color, color.withOpacity(0.0)],
         ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        )) : null,
       ),
     );
   }
@@ -1387,7 +1390,7 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
-            gradient: isDark
+            gradient: AppCore.isWindows ? null : isDark
                 ? const LinearGradient(
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
@@ -1406,6 +1409,25 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
                       Color(0xFFEDE9FE),
                     ],
                   ),
+            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFF221535),
+                      Color(0xFF161A30),
+                      Color(0xFF112A2E),
+                    ],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFF5F3FF),
+                      Color(0xFFEDE9FE),
+                    ],
+                  )) : null,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: purpleNeon.withOpacity(isDark ? 0.50 : 0.32),
@@ -1500,7 +1522,7 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        gradient: isDark
+        gradient: AppCore.isWindows ? null : isDark
             ? LinearGradient(
                 colors: [
                   const Color(0xFF141829).withOpacity(0.96),
@@ -1513,6 +1535,19 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
                   const Color(0xFFF8FAFC).withOpacity(0.95),
                 ],
               ),
+        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF141829).withOpacity(0.96),
+                  Color.lerp(const Color(0xFF0F1322), purpleNeon, 0.08)!,
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.98),
+                  const Color(0xFFF8FAFC).withOpacity(0.95),
+                ],
+              )) : null,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: purpleNeon.withOpacity(isDark ? 0.45 : 0.30),
@@ -1957,7 +1992,7 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
                                       Container(
                                         padding: const EdgeInsets.all(18),
                                         decoration: BoxDecoration(
-                                          gradient: isDark
+                                          gradient: AppCore.isWindows ? null : isDark
                                               ? LinearGradient(
                                                   begin: Alignment.topLeft,
                                                   end: Alignment.bottomRight,
@@ -1982,6 +2017,31 @@ class _BatchStudentPhotosScreenState extends State<BatchStudentPhotosScreen>
                                                         0.04)!,
                                                   ],
                                                 ),
+                                          color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
+                                              ? LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    const Color(0xFF141829)
+                                                        .withOpacity(0.95),
+                                                    Color.lerp(
+                                                        const Color(0xFF0F1322),
+                                                        blueNeon,
+                                                        0.08)!,
+                                                  ],
+                                                )
+                                              : LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    Colors.white
+                                                        .withOpacity(0.96),
+                                                    Color.lerp(
+                                                        const Color(0xFFF8FAFC),
+                                                        blueNeon,
+                                                        0.04)!,
+                                                  ],
+                                                )) : null,
                                           borderRadius:
                                               BorderRadius.circular(24),
                                           border: Border.all(
@@ -2698,7 +2758,7 @@ class _AnimatedBatchPhotosOrbIcon extends StatelessWidget {
                   height: size * 0.64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: AppCore.isWindows ? null : LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -2706,6 +2766,14 @@ class _AnimatedBatchPhotosOrbIcon extends StatelessWidget {
                         Color.lerp(primaryColor, Colors.black, 0.25)!,
                       ],
                     ),
+                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        primaryColor,
+                        Color.lerp(primaryColor, Colors.black, 0.25)!,
+                      ],
+                    )) : null,
                     border: Border.all(
                       color: Colors.white.withOpacity(0.45),
                       width: 1.3,

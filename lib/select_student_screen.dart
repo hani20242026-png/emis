@@ -699,10 +699,13 @@ class _SelectStudentScreenState extends State<SelectStudentScreen> {
             ),
             centerTitle: true,
             flexibleSpace: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
+              decoration: BoxDecoration(
+                gradient: AppCore.isWindows ? null : LinearGradient(
                   colors: [Color(0xFF1A237E), Color(0xFF4A90E2)],
                 ),
+                color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                  colors: [Color(0xFF1A237E), Color(0xFF4A90E2)],
+                )) : null,
               ),
             ),
             iconTheme: const IconThemeData(color: Colors.white),
@@ -932,11 +935,16 @@ class _SelectStudentScreenState extends State<SelectStudentScreen> {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const LinearGradient(
+          gradient: AppCore.isWindows ? null : const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF8B5CF6), Color(0xFF60A5FA), Color(0xFFDBEAFE)],
           ),
+          color: AppCore.isWindows ? AppCore.windowsGradientFallback(const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF8B5CF6), Color(0xFF60A5FA), Color(0xFFDBEAFE)],
+          )) : null,
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF6366F1).withOpacity(.22),
@@ -947,7 +955,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen> {
         ),
         child: Container(
           padding: const EdgeInsets.all(3),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: Colors.white,
           ),
@@ -1120,11 +1128,16 @@ class _SelectStudentScreenState extends State<SelectStudentScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(13),
-                                    gradient: LinearGradient(
+                                    gradient: AppCore.isWindows ? null : LinearGradient(
                                       colors: isDarkMode
                                           ? [const Color(0xFF1D3B39), const Color(0xFF202E3B)]
                                           : [const Color(0xFFE8FBF2), const Color(0xFFEAF8FC)],
                                     ),
+                                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+                                      colors: isDarkMode
+                                          ? [const Color(0xFF1D3B39), const Color(0xFF202E3B)]
+                                          : [const Color(0xFFE8FBF2), const Color(0xFFEAF8FC)],
+                                    )) : null,
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,

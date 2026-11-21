@@ -523,13 +523,19 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          gradient: AppCore.isWindows ? null : LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF42A5F5), Color(0xFF81C784)],
             stops: [0.0, 0.35, 0.7, 1.0],
           ),
+          color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF42A5F5), Color(0xFF81C784)],
+            stops: [0.0, 0.35, 0.7, 1.0],
+          )) : null,
         ),
         child: SafeArea(
           child: Center(
