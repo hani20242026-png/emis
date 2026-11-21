@@ -175,17 +175,81 @@ jobs:
       - name: Build Windows installer (EXE)
         shell: pwsh
         run: |
-          choco install innosetup --no-progress -y
-          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          # Locate Inno Setup first. Chocolatey can report a non-zero exit code
+          # when the package is already installed, so installation is attempted
+          # only when the compiler cannot be found.
+          $candidatePaths = @(
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+            (Join-Path $env:ChocolateyInstall 'lib\innosetup\tools\ISCC.exe'),
+            (Join-Path $env:ChocolateyInstall 'bin\ISCC.exe'),
+            'C:\tools\innosetup\ISCC.exe'
+          ) | Where-Object { $_ -and $_ -ne '' }
 
-          $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
-          & $iscc 'installer\EMIS-Setup.iss'
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          $isccCommand = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+          $iscc = $null
+          if ($isccCommand) { $iscc = $isccCommand.Source }
+
+          if (-not $iscc) {
+            foreach ($candidate in $candidatePaths) {
+              if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $iscc = $candidate
+                break
+              }
+            }
+          }
+
+          if (-not $iscc) {
+            Write-Host 'Inno Setup compiler was not found; installing it on this temporary runner.'
+            choco install innosetup --no-progress -y
+            $installExitCode = $LASTEXITCODE
+
+            # Re-scan even when Chocolatey returns non-zero (for example,
+            # because the package became installed before this step ran).
+            $isccCommand = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+            if ($isccCommand) { $iscc = $isccCommand.Source }
+
+            if (-not $iscc) {
+              foreach ($candidate in $candidatePaths) {
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                  $iscc = $candidate
+                  break
+                }
+              }
+            }
+
+            if (-not $iscc) {
+              throw "Inno Setup installation/compiler lookup failed (Chocolatey exit code: $installExitCode). Checked: $($candidatePaths -join '; ')"
+            }
+          }
+
+          Write-Host "Using Inno Setup compiler: $iscc"
+
+          $issFile = 'installer\EMIS-Setup.iss'
+          $releaseDir = 'build\windows\x64\runner\Release'
+          $expectedExe = Join-Path $releaseDir 'iraq_emis.exe'
+          if (-not (Test-Path -LiteralPath $issFile -PathType Leaf)) {
+            throw "Inno Setup script was not found: $issFile"
+          }
+          if (-not (Test-Path -LiteralPath $expectedExe -PathType Leaf)) {
+            throw "Expected application executable was not found: $expectedExe"
+          }
+
+          New-Item -ItemType Directory -Force -Path 'installer-output' | Out-Null
+          & $iscc $issFile
+          $compileExitCode = $LASTEXITCODE
+          if ($compileExitCode -ne 0) {
+            throw "Inno Setup failed with exit code $compileExitCode"
+          }
 
           $installer = 'installer-output\EMIS-Setup.exe'
-          if (-not (Test-Path $installer)) { throw 'EMIS installer EXE was not created.' }
-          Write-Host "Created installer: $installer"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "EMIS installer EXE was not created at: $installer"
+          }
+          if ((Get-Item -LiteralPath $installer).Length -lt 1000000) {
+            throw 'EMIS installer EXE is unexpectedly small; verify the packaged release files.'
+          }
+          Write-Host "Created installer: $((Resolve-Path $installer).Path)"
 
       - name: Generate GitHub build provenance attestation
         uses: actions/attest@v4
