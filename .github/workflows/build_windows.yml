@@ -118,7 +118,16 @@ jobs:
           $icoPath = 'windows\runner\resources\app_icon.ico'
           if (-not (Test-Path $icoPath)) { throw "Original EMIS icon is missing: $icoPath" }
           if ((Get-Item $icoPath).Length -lt 1000) { throw 'The EMIS ICO file appears invalid or empty.' }
-          if (-not (Select-String -Path 'windows\runner\Runner.rc' -Pattern 'resources\\app_icon\.ico' -Quiet)) {
+          $rcPath = 'windows\runner\Runner.rc'
+          if (-not (Test-Path $rcPath)) {
+            throw "Windows resource file is missing: $rcPath"
+          }
+
+          # Accept one or more backslashes or forward slashes in Runner.rc.
+          $rcContent = Get-Content -Path $rcPath -Raw
+          if ($rcContent -notmatch 'resources[\\/]+app_icon\.ico') {
+            Write-Host '----- Runner.rc content -----'
+            Get-Content -Path $rcPath
             throw 'Runner.rc does not reference the original app_icon.ico.'
           }
           Write-Host 'Verified original EMIS icon and Runner.rc reference.'
