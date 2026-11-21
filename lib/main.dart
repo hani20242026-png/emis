@@ -89,8 +89,8 @@ ThemeData _windowsLightTheme() {
     ),
     iconTheme: const IconThemeData(color: foreground),
     textTheme: ThemeData.light().textTheme.apply(bodyColor: foreground, displayColor: foreground, fontFamily: 'Tajawal'),
-    cardTheme: const CardTheme(color: Colors.white, surfaceTintColor: Colors.transparent, elevation: 1),
-    dialogTheme: const DialogTheme(backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
+    cardTheme: const CardThemeData(color: Colors.white, surfaceTintColor: Colors.transparent, elevation: 1),
+    dialogTheme: const DialogThemeData(backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
     inputDecorationTheme: InputDecorationTheme(
       filled: true, fillColor: Colors.white,
       labelStyle: const TextStyle(color: Color(0xFF536078)),
@@ -125,8 +125,8 @@ ThemeData _windowsDarkTheme() {
     ),
     iconTheme: const IconThemeData(color: foreground),
     textTheme: ThemeData.dark().textTheme.apply(bodyColor: foreground, displayColor: foreground, fontFamily: 'Tajawal'),
-    cardTheme: const CardTheme(color: surface, surfaceTintColor: Colors.transparent, elevation: 1),
-    dialogTheme: const DialogTheme(backgroundColor: surface, surfaceTintColor: Colors.transparent),
+    cardTheme: const CardThemeData(color: surface, surfaceTintColor: Colors.transparent, elevation: 1),
+    dialogTheme: const DialogThemeData(backgroundColor: surface, surfaceTintColor: Colors.transparent),
     inputDecorationTheme: InputDecorationTheme(
       filled: true, fillColor: surface,
       labelStyle: const TextStyle(color: Color(0xFFB7BED0)),

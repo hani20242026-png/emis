@@ -1981,10 +1981,17 @@ class _SchoolCardDetailScreenState extends State<SchoolCardDetailScreen>
                 gradient: AppCore.isWindows ? null : active
                     ? const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF6366F1)])
                     : null,
-                color: AppCore.isWindows ? AppCore.windowsGradientFallback(active
-                    ? const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF6366F1)])
-                    : null) : null,
-                color: active ? null : (isDark ? const Color(0xFF141829) : Colors.white),
+                color: AppCore.isWindows
+                    ? (active
+                        ? AppCore.windowsGradientFallback(
+                            const LinearGradient(
+                              colors: [Color(0xFFA855F7), Color(0xFF6366F1)],
+                            ),
+                          )
+                        : (isDark ? const Color(0xFF141829) : Colors.white))
+                    : (active
+                        ? null
+                        : (isDark ? const Color(0xFF141829) : Colors.white)),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: active ? Colors.transparent : _purple.withOpacity(isDark ? 0.3 : 0.2),
