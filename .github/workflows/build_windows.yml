@@ -5,6 +5,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: build-windows-${{ github.ref }}
@@ -57,6 +59,12 @@ jobs:
       - name: Regenerate Windows platform files
         shell: pwsh
         run: |
+          # Preserve the project's real application icon before regenerating runner files.
+          $iconSource = 'windows\runner\resources\app_icon.ico'
+          $iconBackup = Join-Path $env:RUNNER_TEMP 'emis-app-icon.ico'
+          if (-not (Test-Path $iconSource)) { throw "Project icon is missing: $iconSource" }
+          Copy-Item $iconSource $iconBackup -Force
+
           if (Test-Path 'windows') {
             Remove-Item 'windows' -Recurse -Force
           }
@@ -77,7 +85,13 @@ jobs:
             }
           }
 
-          Write-Host 'Windows platform files were regenerated successfully.'
+          # Restore the exact ICO asset after flutter create has regenerated windows/.
+          New-Item -ItemType Directory -Force -Path 'windows\runner\resources' | Out-Null
+          Copy-Item $iconBackup 'windows\runner\resources\app_icon.ico' -Force
+          if (-not (Test-Path 'windows\runner\resources\app_icon.ico')) {
+            throw 'The original EMIS application icon was not restored.'
+          }
+          Write-Host 'Windows platform files regenerated; original EMIS icon restored.'
 
       - name: Resolve Flutter dependencies
         shell: pwsh
@@ -98,71 +112,16 @@ jobs:
             throw "Local AI Windows stub preparation failed with exit code $LASTEXITCODE"
           }
 
-      - name: Ensure Windows application icon exists
+      - name: Verify original Windows application icon
         shell: pwsh
         run: |
-          $icoPath = 'windows\runner\resources\appicon.ico'
-
-          if (-not (Test-Path $icoPath)) {
-            New-Item -ItemType Directory -Force -Path (Split-Path $icoPath) | Out-Null
-            Add-Type -AssemblyName System.Drawing
-
-            $sourcePng = @(
-              'assets\appicon.png',
-              'assets\icon.png',
-              'assets\logo.png'
-            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-            if ($sourcePng) {
-              $sourceBitmap = [System.Drawing.Bitmap]::FromFile((Resolve-Path $sourcePng).Path)
-              $bitmap = New-Object System.Drawing.Bitmap($sourceBitmap, 256, 256)
-              $sourceBitmap.Dispose()
-            }
-            else {
-              $bitmap = New-Object System.Drawing.Bitmap(256, 256)
-              $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-              $graphics.Clear([System.Drawing.Color]::FromArgb(255, 22, 26, 48))
-              $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 168, 85, 247), 12)
-              $graphics.DrawEllipse($pen, 28, 28, 200, 200)
-              $font = New-Object System.Drawing.Font('Segoe UI', 54, [System.Drawing.FontStyle]::Bold)
-              $format = New-Object System.Drawing.StringFormat
-              $format.Alignment = [System.Drawing.StringAlignment]::Center
-              $format.LineAlignment = [System.Drawing.StringAlignment]::Center
-              $graphics.DrawString('EMIS', $font, [System.Drawing.Brushes]::White, [System.Drawing.RectangleF]::new(0, 0, 256, 256), $format)
-              $graphics.Dispose()
-              $pen.Dispose()
-              $font.Dispose()
-              $format.Dispose()
-            }
-
-            $pngStream = New-Object System.IO.MemoryStream
-            $bitmap.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)
-            $pngBytes = $pngStream.ToArray()
-            $pngStream.Dispose()
-            $bitmap.Dispose()
-
-            $fileStream = [System.IO.File]::Open($icoPath, [System.IO.FileMode]::Create)
-            $writer = New-Object System.IO.BinaryWriter($fileStream)
-            $writer.Write([UInt16]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]1)
-            $writer.Write([Byte]0)
-            $writer.Write([Byte]0)
-            $writer.Write([Byte]0)
-            $writer.Write([Byte]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$pngBytes.Length)
-            $writer.Write([UInt32]22)
-            $writer.Write($pngBytes)
-            $writer.Dispose()
-            $fileStream.Dispose()
+          $icoPath = 'windows\runner\resources\app_icon.ico'
+          if (-not (Test-Path $icoPath)) { throw "Original EMIS icon is missing: $icoPath" }
+          if ((Get-Item $icoPath).Length -lt 1000) { throw 'The EMIS ICO file appears invalid or empty.' }
+          if (-not (Select-String -Path 'windows\runner\Runner.rc' -Pattern 'resources\\app_icon\.ico' -Quiet)) {
+            throw 'Runner.rc does not reference the original app_icon.ico.'
           }
-
-          if (-not (Test-Path $icoPath)) {
-            throw "Windows application icon could not be created: $icoPath"
-          }
-          Write-Host "Verified: $icoPath"
+          Write-Host 'Verified original EMIS icon and Runner.rc reference.'
 
       - name: Build Windows EXE
         shell: pwsh
@@ -204,24 +163,30 @@ jobs:
             Measure-Object -Property Length -Sum |
             ForEach-Object { Write-Host "Release files: $($_.Count); total bytes: $($_.Sum)" }
 
-      - name: Package Windows application
+      - name: Build Windows installer (EXE)
         shell: pwsh
         run: |
-          $releaseDir = 'build\windows\x64\runner\Release'
-          $zipPath = 'iraq_emis_windows_exe.zip'
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
 
-          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-          Compress-Archive -Path "$releaseDir\*" -DestinationPath $zipPath -CompressionLevel Optimal
+          $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          & $iscc 'installer\EMIS-Setup.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
-          if (-not (Test-Path $zipPath)) {
-            throw 'Windows ZIP package was not created.'
-          }
-          Write-Host "Package created: $zipPath"
+          $installer = 'installer-output\EMIS-Setup.exe'
+          if (-not (Test-Path $installer)) { throw 'EMIS installer EXE was not created.' }
+          Write-Host "Created installer: $installer"
 
-      - name: Upload Windows EXE package
+      - name: Generate GitHub build provenance attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'installer-output/EMIS-Setup.exe'
+
+      - name: Upload Windows installer EXE
         uses: actions/upload-artifact@v4
         with:
-          name: iraq-emis-windows-exe
-          path: iraq_emis_windows_exe.zip
+          name: EMIS-Windows-Installer
+          path: installer-output/EMIS-Setup.exe
           if-no-files-found: error
           retention-days: 14
