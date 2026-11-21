@@ -166,7 +166,6 @@ poll();
     final profile = Directory('$appData\\EMIS\\ChromeSpeechProfile');
     await profile.create(recursive: true);
     final permissionMarker = File('${profile.path}\\microphone-permission-granted.marker');
-    final permissionWasGranted = await permissionMarker.exists();
     final token = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _chromeSpeechServer = server;
@@ -231,8 +230,11 @@ poll();
         '--no-first-run', '--no-default-browser-check', '--disable-background-mode',
         '--disable-session-crashed-bubble', '--noerrdialogs',
         '--user-data-dir=${profile.path}', '--new-window', '--app=$url',
-        if (permissionWasGranted) '--window-position=-32000,-32000',
+        // Keep the helper app window off-screen on every launch.
+        // Microphone permission is persisted in the dedicated Chrome profile.
+        '--window-position=-32000,-32000',
         '--window-size=900,650',
+        '--start-minimized',
       ], mode: ProcessStartMode.detached);
     } catch (error) {
       await server.close(force: true);
