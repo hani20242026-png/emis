@@ -119,7 +119,7 @@ class _SiriOrbState extends State<SiriOrb>
                                   height: 62,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: const SweepGradient(
+                                    gradient: AppCore.isWindows ? null : const SweepGradient(
                                       colors: [
                                         Color(0xFF00D5FF),
                                         Color(0xFF8B5CF6),
@@ -127,6 +127,14 @@ class _SiriOrbState extends State<SiriOrb>
                                         Color(0xFF00D5FF),
                                       ],
                                     ),
+                                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(const SweepGradient(
+                                      colors: [
+                                        Color(0xFF00D5FF),
+                                        Color(0xFF8B5CF6),
+                                        Color(0xFFFF4FCB),
+                                        Color(0xFF00D5FF),
+                                      ],
+                                    )) : null,
                                     boxShadow: [
                                       BoxShadow(
                                         color: const Color(0xFF8B5CF6)
