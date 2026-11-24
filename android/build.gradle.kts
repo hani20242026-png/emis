@@ -22,20 +22,6 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// Enforce API 36 after each Android library plugin has completed its own
-// Gradle configuration. Some Flutter plugins (including file_picker 8.x)
-// overwrite compileSdk during their build-script evaluation; configuring
-// LibraryExtension only when the plugin is first applied is therefore too
-// early. This changes compileSdk only, not minSdk or targetSdk.
-subprojects {
-    plugins.withId("com.android.library") {
-        afterEvaluate {
-            extensions.findByType<com.android.build.api.dsl.LibraryExtension>()
-                ?.compileSdk = 36
-        }
-    }
-}
-
 subprojects {
     project.evaluationDependsOn(":app")
 }
