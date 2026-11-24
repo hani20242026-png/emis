@@ -22,14 +22,16 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// Some Flutter Android plugins (notably file_picker) declare an older
-// compileSdk in their own Gradle files. Their dependencies can require API 36,
-// so align every Android library module with the application's compileSdk.
-// This does not change targetSdk, minSdk, or runtime behavior.
+// Enforce API 36 after each Android library plugin has completed its own
+// Gradle configuration. Some Flutter plugins (including file_picker 8.x)
+// overwrite compileSdk during their build-script evaluation; configuring
+// LibraryExtension only when the plugin is first applied is therefore too
+// early. This changes compileSdk only, not minSdk or targetSdk.
 subprojects {
     plugins.withId("com.android.library") {
-        extensions.configure<com.android.build.api.dsl.LibraryExtension> {
-            compileSdk = 36
+        afterEvaluate {
+            extensions.findByType<com.android.build.api.dsl.LibraryExtension>()
+                ?.compileSdk = 36
         }
     }
 }
