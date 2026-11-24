@@ -686,13 +686,102 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
     if (result != null && mounted) setState(() => files = result.files);
   }
 
-  String _personName(Map<String, dynamic> p) =>
-      (p['displayName'] ?? p['fullName'] ?? p['employeeFullName'] ??
-              p['employeeName'] ?? p['name'] ??
-              '${p['firstName'] ?? ''} ${p['lastName'] ?? ''}')
-          .toString().replaceAll('|', '').trim();
+  String _personName(Map<String, dynamic> p) {
+    final direct = p['employeeFullName'] ??
+        p['displayName'] ??
+        p['fullName'] ??
+        p['employeeName'] ??
+        p['name'];
+    if (direct != null && direct.toString().trim().isNotEmpty) {
+      return direct.toString().replaceAll('|', '').trim();
+    }
+
+    // بعض سجلات الموظفين لا تعيد employeeFullName، بل أجزاء الاسم منفصلة.
+    const nameKeys = <String>[
+      'firstName',
+      'fatherName',
+      'grandFatherName',
+      'familyName',
+      'surname',
+    ];
+    final parts = nameKeys
+        .map((key) => (p[key] ?? '').toString().trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isNotEmpty) return parts.join(' ');
+
+    final nested = p['employee'] ?? p['person'];
+    if (nested is Map) {
+      final nestedMap = <String, dynamic>{
+        for (final entry in nested.entries) entry.key.toString(): entry.value,
+      };
+      return _personName(nestedMap);
+    }
+    return '';
+  }
   String _personId(Map<String, dynamic> p) => (p['value'] ?? p['id'] ?? p['employeeId'] ?? '').toString();
-  String _entityName(Map<String, dynamic> e) => (e['name'] ?? e['displayName'] ?? '').toString();
+  String _entityName(Map<String, dynamic> e) =>
+      (e['name'] ?? e['displayName'] ?? '').toString().trim();
+
+  List<String> _entityParents(Map<String, dynamic> e) {
+    final raw = e['parents'];
+    if (raw is! List) return <String>[];
+    return raw
+        .whereType<Map>()
+        .map((parent) => (parent['name'] ?? '').toString().trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
+  Widget _entityMenuContent(
+    Map<String, dynamic> entity, {
+    required bool selected,
+  }) {
+    final parents = _entityParents(entity);
+    final muted = Theme.of(context).hintColor;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _entityName(entity),
+            softWrap: true,
+            maxLines: 3,
+            overflow: TextOverflow.visible,
+            style: TextStyle(
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          if (parents.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            for (final parent in parents)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  parent,
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
+                  style: TextStyle(color: muted, fontSize: 11.5),
+                ),
+              ),
+          ],
+          if ((entity['sensusNumber'] ?? '').toString().trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                'الرمز: ${entity['sensusNumber']}',
+                style: TextStyle(color: muted, fontSize: 10.5),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   String _entityId(Map<String, dynamic> e) => (e['id'] ?? e['value'] ?? '').toString();
 
   Future<void> _save() async {
@@ -936,9 +1025,39 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
                       onChanged: (v) => setState(() => transferType = v ?? ''),
                     ),
                     const SizedBox(height: 14),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: true,
+                          icon: Icon(Icons.school_rounded),
+                          label: Text('المدرسون'),
+                        ),
+                        ButtonSegment<bool>(
+                          value: false,
+                          icon: Icon(Icons.badge_rounded),
+                          label: Text('الموظفون'),
+                        ),
+                      ],
+                      selected: <bool>{isTeacher},
+                      onSelectionChanged: (selection) {
+                        final nextValue = selection.first;
+                        if (nextValue == isTeacher) return;
+                        setState(() {
+                          isTeacher = nextValue;
+                          selectedPerson = null;
+                          people = [];
+                          _searchController.clear();
+                        });
+                        _loadPeople();
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _searchController,
-                      decoration: _fieldDecoration('بحث عن المدرس', icon: Icons.search),
+                      decoration: _fieldDecoration(
+                        isTeacher ? 'بحث عن المدرس' : 'بحث عن الموظف',
+                        icon: Icons.search,
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 10),
@@ -946,7 +1065,7 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
                     DropdownButtonFormField<Map<String, dynamic>>(
                       isExpanded: true,
                       value: selectedPerson,
-                      decoration: _fieldDecoration('اسم المدرس *'),
+                      decoration: _fieldDecoration(isTeacher ? 'اسم المدرس *' : 'اسم الموظف *'),
                       items: filteredPeople.map((p) => DropdownMenuItem(
                         value: p,
                         child: Text('${_personName(p)}${p['employeeIdNumber'] != null ? ' | ${p['employeeIdNumber']}' : ''}', overflow: TextOverflow.ellipsis),
@@ -996,18 +1115,24 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
                     ),
                   DropdownButtonFormField<Map<String, dynamic>>(
                     isExpanded: true,
+                    itemHeight: null,
+                    menuMaxHeight: MediaQuery.of(context).size.height * 0.72,
                     value: selectedEntity,
-                    decoration: _fieldDecoration(employee ? 'الجهة المنقول إليها *' : 'إلى الجهة *', icon: Icons.account_balance_rounded),
-                    items: entities.map((e) => DropdownMenuItem(
-                      value: e,
-                      child: Text(
-                        _entityName(e) + (e['parents'] is List && (e['parents'] as List).isNotEmpty
-                            ? ' — ${(e['parents'] as List).whereType<Map>().map((p) => p['name']).whereType<String>().take(2).join(' / ')}'
-                            : ''),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    decoration: _fieldDecoration(
+                      employee ? 'الجهة المنقول إليها *' : 'إلى الجهة *',
+                      icon: Icons.account_balance_rounded,
+                    ),
+                    items: entities.map((entity) => DropdownMenuItem(
+                      value: entity,
+                      child: _entityMenuContent(entity, selected: false),
                     )).toList(),
-                    onChanged: (v) => setState(() => selectedEntity = v),
+                    selectedItemBuilder: (context) => entities
+                        .map((entity) => Align(
+                              alignment: Alignment.centerRight,
+                              child: _entityMenuContent(entity, selected: true),
+                            ))
+                        .toList(),
+                    onChanged: (value) => setState(() => selectedEntity = value),
                   ),
                   const SizedBox(height: 14),
                   OutlinedButton.icon(
