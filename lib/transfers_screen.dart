@@ -343,6 +343,45 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
   bool get employee => widget.isEmployee;
   static const Map<String, String> transferTypes = {'نقل': '1', 'تنسیب': '2', 'تكليف': '3', 'إكمال نصاب': '4'};
 
+  /// يحوّل استجابات API المختلفة إلى قائمة خرائط بأمان.
+  /// بعض نقاط النهاية تعيد List<dynamic> مباشرة، وأخرى تعيدها داخل data/result/items.
+  List<Map<String, dynamic>> _extractMapList(dynamic decoded) {
+    dynamic current = decoded;
+    for (var depth = 0; depth < 5; depth++) {
+      if (current is List) {
+        final result = <Map<String, dynamic>>[];
+        for (final item in current) {
+          if (item is Map) {
+            final map = <String, dynamic>{};
+            item.forEach((key, value) {
+              map[key.toString()] = value;
+            });
+            result.add(map);
+          }
+        }
+        return result;
+      }
+      if (current is Map) {
+        dynamic next;
+        var found = false;
+        for (final key in const ['data', 'result', 'items', 'results', 'employees', 'students', 'schools', 'entities']) {
+          final value = current[key];
+          if (value is List || value is Map) {
+            next = value;
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          current = next;
+          continue;
+        }
+      }
+      break;
+    }
+    return <Map<String, dynamic>>[];
+  }
+
   @override
   void initState() { super.initState(); _loadEntities(); _loadPeople(); }
   @override
@@ -357,9 +396,13 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
       } else {
         decoded = await _TransferApi.get(widget.token, '/selectoption/getstudentsbyschoolsandstages/${widget.schoolId}/${_stageController.text.trim()}');
       }
-      final list = decoded is List ? decoded : (decoded is Map && decoded['data'] is List ? decoded['data'] : []);
+      final parsedPeople = _extractMapList(decoded);
       if (mounted) setState(() {
-        people = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        people = parsedPeople;
+        if (selectedPerson != null &&
+            !people.any((p) => _personId(p) == _personId(selectedPerson!))) {
+          selectedPerson = null;
+        }
         loadingPeople = false;
       });
     } catch (e) {
@@ -376,8 +419,15 @@ class _TransferFormDialogState extends State<_TransferFormDialog> {
               ? '/MinistryEntity/GetAllMinistryEntitiesWithSchools${employee ? '' : '/160'}'
               : '/MinistryEntity/SearchAndGetAllMinistryEntitiesWithSchools/${Uri.encodeComponent(query.trim())}');
       final decoded = await _TransferApi.get(widget.token, path);
-      final list = decoded is List ? decoded : (decoded is Map && decoded['data'] is List ? decoded['data'] : []);
-      if (mounted) setState(() { entities = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); loadingEntities = false; });
+      final parsedEntities = _extractMapList(decoded);
+      if (mounted) setState(() {
+        entities = parsedEntities;
+        if (selectedEntity != null &&
+            !entities.any((e) => _entityId(e) == _entityId(selectedEntity!))) {
+          selectedEntity = null;
+        }
+        loadingEntities = false;
+      });
     } catch (e) {
       if (mounted) setState(() { loadingEntities = false; error = 'تعذر تحميل الجهات: $e'; });
     }
