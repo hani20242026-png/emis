@@ -14,6 +14,7 @@ import 'grades_screen.dart';
 import 'daily_absence_screen.dart';
 import 'add_student_screen.dart';
 import 'add_teacher_screen.dart';
+import 'transfers_screen.dart';
 import 'ai_assistant/ai_assistant_controller.dart';
 import 'ai_assistant/ai_command_parser.dart';
 
@@ -84,8 +85,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       AppCore.aiAssistantAvailableNotifier.value = true;
       AiAssistantController.instance.dispatcher.onCommand = _handleAiCommand;
     }
-    _studentCount = widget.allStudents.whereType<Map<String, dynamic>>().length;
-    _teacherCount = widget.allTeachers.whereType<Map<String, dynamic>>().length;
+    _studentCount = widget.allStudents.whereType>().length;
+    _teacherCount = widget.allTeachers.whereType>().length;
     _employeeCount = 0;
     _restoreCachedCounts();
     _refreshDashboardCounts();
@@ -145,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final data = _unwrap(jsonDecode(utf8.decode(r.bodyBytes)));
       if (data is List) {
         final students = data
-            .whereType<Map<String, dynamic>>()
+            .whereType>()
             .map((e) => JsonMap.from(e))
             .toList();
 
@@ -193,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final data = decoded is Map ? decoded['data'] : null;
         if (data is List) {
           teachers = data
-              .whereType<Map<String, dynamic>>()
+              .whereType>()
               .map((e) => JsonMap.from(e))
               .toList();
 
@@ -245,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final decoded = jsonDecode(utf8.decode(listResponse.bodyBytes));
         final data = decoded is Map ? decoded['data'] : null;
         if (data is List) {
-          employees = data.whereType<Map<String, dynamic>>().map((e) => JsonMap.from(e)).toList();
+          employees = data.whereType>().map((e) => JsonMap.from(e)).toList();
         }
       }
       int count = employees.length;
@@ -792,7 +793,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => StudentSchoolCardScreen(
+                                          builder: (_) =>
+                                              StudentSchoolCardScreen(
                                             token: widget.token,
                                             schoolId: widget.schoolId,
                                           ),
@@ -850,6 +852,30 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       ),
                                     ),
                                   ),
+                                  SizedBox(
+                                    width: cardWidth,
+                                    height: cardHeight,
+                                    child: _AnimatedServiceCard(
+                                      title: 'الانتقالات',
+                                      icon: Icons.swap_horiz_rounded,
+                                      accentColor: goldNeon,
+                                      secondaryColor: blueNeon,
+                                      isDark: isDark,
+                                      animation: _ambientController,
+                                      effectType: _IconEffectType.orbitalSwirl,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => TransfersScreen(
+                                            token: widget.token,
+                                            schoolId: widget.schoolId,
+                                          ),
+                                        ),
+                                      ).then((_) {
+                                        _refreshDashboardCounts();
+                                      }),
+                                    ),
+                                  ),
                                 ],
                               );
                             },
@@ -873,12 +899,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: AppCore.isWindows ? null : RadialGradient(
-          colors: [color, color.withOpacity(0.0)],
-        ),
-        color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
-          colors: [color, color.withOpacity(0.0)],
-        )) : null,
+        gradient: AppCore.isWindows
+            ? null
+            : RadialGradient(
+                colors: [color, color.withOpacity(0.0)],
+              ),
+        color: AppCore.isWindows
+            ? AppCore.windowsGradientFallback(RadialGradient(
+                colors: [color, color.withOpacity(0.0)],
+              ))
+            : null,
       ),
     );
   }
@@ -902,44 +932,48 @@ class _DashboardScreenState extends State<DashboardScreen>
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
           decoration: BoxDecoration(
-            gradient: AppCore.isWindows ? null : isDark
-                ? const LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      Color(0xFF112A2E),
-                      Color(0xFF161A30),
-                      Color(0xFF241734),
-                    ],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      Color(0xFFFFFFFF),
-                      Color(0xFFF3F6FC),
-                      Color(0xFFEDE9FE),
-                    ],
-                  ),
-            color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
-                ? const LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      Color(0xFF112A2E),
-                      Color(0xFF161A30),
-                      Color(0xFF241734),
-                    ],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      Color(0xFFFFFFFF),
-                      Color(0xFFF3F6FC),
-                      Color(0xFFEDE9FE),
-                    ],
-                  )) : null,
+            gradient: AppCore.isWindows
+                ? null
+                : isDark
+                    ? const LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          Color(0xFF112A2E),
+                          Color(0xFF161A30),
+                          Color(0xFF241734),
+                        ],
+                      )
+                    : const LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          Color(0xFFFFFFFF),
+                          Color(0xFFF3F6FC),
+                          Color(0xFFEDE9FE),
+                        ],
+                      ),
+            color: AppCore.isWindows
+                ? AppCore.windowsGradientFallback(isDark
+                    ? const LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          Color(0xFF112A2E),
+                          Color(0xFF161A30),
+                          Color(0xFF241734),
+                        ],
+                      )
+                    : const LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          Color(0xFFFFFFFF),
+                          Color(0xFFF3F6FC),
+                          Color(0xFFEDE9FE),
+                        ],
+                      ))
+                : null,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: borderGlow,
@@ -986,32 +1020,36 @@ class _DashboardScreenState extends State<DashboardScreen>
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: AppCore.isWindows ? null : LinearGradient(
-                          colors: isDark
-                              ? [
-                                  const Color(0xFF10B981),
-                                  const Color(0xFF06B6D4),
-                                  const Color(0xFFA855F7),
-                                ]
-                              : [
-                                  const Color(0xFFA855F7),
-                                  const Color(0xFF6366F1),
-                                  const Color(0xFF3B82F6),
-                                ],
-                        ),
-                        color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
-                          colors: isDark
-                              ? [
-                                  const Color(0xFF10B981),
-                                  const Color(0xFF06B6D4),
-                                  const Color(0xFFA855F7),
-                                ]
-                              : [
-                                  const Color(0xFFA855F7),
-                                  const Color(0xFF6366F1),
-                                  const Color(0xFF3B82F6),
-                                ],
-                        )) : null,
+                        gradient: AppCore.isWindows
+                            ? null
+                            : LinearGradient(
+                                colors: isDark
+                                    ? [
+                                        const Color(0xFF10B981),
+                                        const Color(0xFF06B6D4),
+                                        const Color(0xFFA855F7),
+                                      ]
+                                    : [
+                                        const Color(0xFFA855F7),
+                                        const Color(0xFF6366F1),
+                                        const Color(0xFF3B82F6),
+                                      ],
+                              ),
+                        color: AppCore.isWindows
+                            ? AppCore.windowsGradientFallback(LinearGradient(
+                                colors: isDark
+                                    ? [
+                                        const Color(0xFF10B981),
+                                        const Color(0xFF06B6D4),
+                                        const Color(0xFFA855F7),
+                                      ]
+                                    : [
+                                        const Color(0xFFA855F7),
+                                        const Color(0xFF6366F1),
+                                        const Color(0xFF3B82F6),
+                                      ],
+                              ))
+                            : null,
                       ),
                       child: ClipOval(
                         child: Container(
@@ -1128,32 +1166,36 @@ class _DashboardScreenState extends State<DashboardScreen>
                   height: 46,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: AppCore.isWindows ? null : LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              const Color(0xFF3B3024),
-                              const Color(0xFF221D1A),
-                            ]
-                          : [
-                              const Color(0xFFFEF3C7),
-                              const Color(0xFFFDE68A),
-                            ],
-                    ),
-                    color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              const Color(0xFF3B3024),
-                              const Color(0xFF221D1A),
-                            ]
-                          : [
-                              const Color(0xFFFEF3C7),
-                              const Color(0xFFFDE68A),
-                            ],
-                    )) : null,
+                    gradient: AppCore.isWindows
+                        ? null
+                        : LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? [
+                                    const Color(0xFF3B3024),
+                                    const Color(0xFF221D1A),
+                                  ]
+                                : [
+                                    const Color(0xFFFEF3C7),
+                                    const Color(0xFFFDE68A),
+                                  ],
+                          ),
+                    color: AppCore.isWindows
+                        ? AppCore.windowsGradientFallback(LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? [
+                                    const Color(0xFF3B3024),
+                                    const Color(0xFF221D1A),
+                                  ]
+                                : [
+                                    const Color(0xFFFEF3C7),
+                                    const Color(0xFFFDE68A),
+                                  ],
+                          ))
+                        : null,
                     border: Border.all(
                       color: const Color(0xFFF59E0B).withOpacity(0.6),
                       width: 1.3,
@@ -1209,16 +1251,28 @@ class _DashboardScreenState extends State<DashboardScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(count, style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    fontSize: 23, height: 1.05, fontWeight: FontWeight.w900,
-                  )),
-                  const SizedBox(height: 3),
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  Text(
+                    count,
                     style: TextStyle(
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      fontSize: 11, fontWeight: FontWeight.w700,
-                    )),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      fontSize: 23,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1230,40 +1284,55 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       decoration: BoxDecoration(
-        gradient: AppCore.isWindows ? null : isDark
-            ? LinearGradient(colors: [
-                const Color(0xFF121829).withOpacity(0.92),
-                const Color(0xFF1A1F35).withOpacity(0.88),
-              ])
-            : LinearGradient(colors: [
-                Colors.white.withOpacity(0.95),
-                const Color(0xFFF8FAFC).withOpacity(0.90),
-              ]),
-        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
-            ? LinearGradient(colors: [
-                const Color(0xFF121829).withOpacity(0.92),
-                const Color(0xFF1A1F35).withOpacity(0.88),
-              ])
-            : LinearGradient(colors: [
-                Colors.white.withOpacity(0.95),
-                const Color(0xFFF8FAFC).withOpacity(0.90),
-              ])) : null,
+        gradient: AppCore.isWindows
+            ? null
+            : isDark
+                ? LinearGradient(colors: [
+                    const Color(0xFF121829).withOpacity(0.92),
+                    const Color(0xFF1A1F35).withOpacity(0.88),
+                  ])
+                : LinearGradient(colors: [
+                    Colors.white.withOpacity(0.95),
+                    const Color(0xFFF8FAFC).withOpacity(0.90),
+                  ]),
+        color: AppCore.isWindows
+            ? AppCore.windowsGradientFallback(isDark
+                ? LinearGradient(colors: [
+                    const Color(0xFF121829).withOpacity(0.92),
+                    const Color(0xFF1A1F35).withOpacity(0.88),
+                  ])
+                : LinearGradient(colors: [
+                    Colors.white.withOpacity(0.95),
+                    const Color(0xFFF8FAFC).withOpacity(0.90),
+                  ]))
+            : null,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.30), width: 1.2),
+        border: Border.all(
+            color: const Color(0xFFF59E0B).withOpacity(0.30), width: 1.2),
         boxShadow: [
-          BoxShadow(color: const Color(0xFFF59E0B).withOpacity(isDark ? 0.08 : 0.06),
-            blurRadius: 18, offset: const Offset(0, 6)),
+          BoxShadow(
+              color: const Color(0xFFF59E0B).withOpacity(isDark ? 0.08 : 0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 6)),
         ],
       ),
       child: Row(
         children: [
-          item(title: 'إجمالي المعلمين', count: _teacherCount.toString(),
-            icon: Icons.badge_rounded, color: const Color(0xFFF59E0B)),
-          Container(width: 1, height: 48,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            color: isDark ? Colors.white12 : Colors.black12),
-          item(title: 'إجمالي الموظفين', count: _employeeCount.toString(),
-            icon: Icons.groups_2_rounded, color: const Color(0xFF10B981)),
+          item(
+              title: 'إجمالي المعلمين',
+              count: _teacherCount.toString(),
+              icon: Icons.badge_rounded,
+              color: const Color(0xFFF59E0B)),
+          Container(
+              width: 1,
+              height: 48,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              color: isDark ? Colors.white12 : Colors.black12),
+          item(
+              title: 'إجمالي الموظفين',
+              count: _employeeCount.toString(),
+              icon: Icons.groups_2_rounded,
+              color: const Color(0xFF10B981)),
         ],
       ),
     );
@@ -1355,32 +1424,36 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: AppCore.isWindows ? null : isDark
-            ? LinearGradient(
-                colors: [
-                  const Color(0xFF121829).withOpacity(0.92),
-                  const Color(0xFF1A1F35).withOpacity(0.88),
-                ],
-              )
-            : LinearGradient(
-                colors: [
-                  Colors.white.withOpacity(0.95),
-                  const Color(0xFFF8FAFC).withOpacity(0.90),
-                ],
-              ),
-        color: AppCore.isWindows ? AppCore.windowsGradientFallback(isDark
-            ? LinearGradient(
-                colors: [
-                  const Color(0xFF121829).withOpacity(0.92),
-                  const Color(0xFF1A1F35).withOpacity(0.88),
-                ],
-              )
-            : LinearGradient(
-                colors: [
-                  Colors.white.withOpacity(0.95),
-                  const Color(0xFFF8FAFC).withOpacity(0.90),
-                ],
-              )) : null,
+        gradient: AppCore.isWindows
+            ? null
+            : isDark
+                ? LinearGradient(
+                    colors: [
+                      const Color(0xFF121829).withOpacity(0.92),
+                      const Color(0xFF1A1F35).withOpacity(0.88),
+                    ],
+                  )
+                : LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.95),
+                      const Color(0xFFF8FAFC).withOpacity(0.90),
+                    ],
+                  ),
+        color: AppCore.isWindows
+            ? AppCore.windowsGradientFallback(isDark
+                ? LinearGradient(
+                    colors: [
+                      const Color(0xFF121829).withOpacity(0.92),
+                      const Color(0xFF1A1F35).withOpacity(0.88),
+                    ],
+                  )
+                : LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.95),
+                      const Color(0xFFF8FAFC).withOpacity(0.90),
+                    ],
+                  ))
+            : null,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: waveColor.withOpacity(isDark ? 0.40 : 0.30),
@@ -1469,56 +1542,60 @@ class _AnimatedServiceCardState extends State<_AnimatedServiceCard> {
 
             return Container(
               decoration: BoxDecoration(
-                gradient: AppCore.isWindows ? null : widget.isDark
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF15192B),
-                          Color.lerp(
-                            const Color(0xFF101322),
-                            widget.accentColor,
-                            0.12,
-                          )!,
-                        ],
-                      )
-                    : LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white,
-                          Color.lerp(
-                            const Color(0xFFF8FAFC),
-                            widget.accentColor,
-                            0.06,
-                          )!,
-                        ],
-                      ),
-                color: AppCore.isWindows ? AppCore.windowsGradientFallback(widget.isDark
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF15192B),
-                          Color.lerp(
-                            const Color(0xFF101322),
-                            widget.accentColor,
-                            0.12,
-                          )!,
-                        ],
-                      )
-                    : LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white,
-                          Color.lerp(
-                            const Color(0xFFF8FAFC),
-                            widget.accentColor,
-                            0.06,
-                          )!,
-                        ],
-                      )) : null,
+                gradient: AppCore.isWindows
+                    ? null
+                    : widget.isDark
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF15192B),
+                              Color.lerp(
+                                const Color(0xFF101322),
+                                widget.accentColor,
+                                0.12,
+                              )!,
+                            ],
+                          )
+                        : LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white,
+                              Color.lerp(
+                                const Color(0xFFF8FAFC),
+                                widget.accentColor,
+                                0.06,
+                              )!,
+                            ],
+                          ),
+                color: AppCore.isWindows
+                    ? AppCore.windowsGradientFallback(widget.isDark
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF15192B),
+                              Color.lerp(
+                                const Color(0xFF101322),
+                                widget.accentColor,
+                                0.12,
+                              )!,
+                            ],
+                          )
+                        : LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white,
+                              Color.lerp(
+                                const Color(0xFFF8FAFC),
+                                widget.accentColor,
+                                0.06,
+                              )!,
+                            ],
+                          ))
+                    : null,
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
                   color: widget.accentColor
@@ -1546,20 +1623,24 @@ class _AnimatedServiceCardState extends State<_AnimatedServiceCard> {
                         height: 95,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: AppCore.isWindows ? null : RadialGradient(
-                            colors: [
-                              widget.accentColor
-                                  .withOpacity(widget.isDark ? 0.28 : 0.16),
-                              widget.accentColor.withOpacity(0.0),
-                            ],
-                          ),
-                          color: AppCore.isWindows ? AppCore.windowsGradientFallback(RadialGradient(
-                            colors: [
-                              widget.accentColor
-                                  .withOpacity(widget.isDark ? 0.28 : 0.16),
-                              widget.accentColor.withOpacity(0.0),
-                            ],
-                          )) : null,
+                          gradient: AppCore.isWindows
+                              ? null
+                              : RadialGradient(
+                                  colors: [
+                                    widget.accentColor.withOpacity(
+                                        widget.isDark ? 0.28 : 0.16),
+                                    widget.accentColor.withOpacity(0.0),
+                                  ],
+                                ),
+                          color: AppCore.isWindows
+                              ? AppCore.windowsGradientFallback(RadialGradient(
+                                  colors: [
+                                    widget.accentColor.withOpacity(
+                                        widget.isDark ? 0.28 : 0.16),
+                                    widget.accentColor.withOpacity(0.0),
+                                  ],
+                                ))
+                              : null,
                         ),
                       ),
                     ),
@@ -1595,30 +1676,35 @@ class _AnimatedServiceCardState extends State<_AnimatedServiceCard> {
                                     height: 62,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: AppCore.isWindows ? null : LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          widget.accentColor,
-                                          Color.lerp(
-                                            widget.accentColor,
-                                            Colors.black,
-                                            0.25,
-                                          )!,
-                                        ],
-                                      ),
-                                      color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          widget.accentColor,
-                                          Color.lerp(
-                                            widget.accentColor,
-                                            Colors.black,
-                                            0.25,
-                                          )!,
-                                        ],
-                                      )) : null,
+                                      gradient: AppCore.isWindows
+                                          ? null
+                                          : LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                widget.accentColor,
+                                                Color.lerp(
+                                                  widget.accentColor,
+                                                  Colors.black,
+                                                  0.25,
+                                                )!,
+                                              ],
+                                            ),
+                                      color: AppCore.isWindows
+                                          ? AppCore.windowsGradientFallback(
+                                              LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                widget.accentColor,
+                                                Color.lerp(
+                                                  widget.accentColor,
+                                                  Colors.black,
+                                                  0.25,
+                                                )!,
+                                              ],
+                                            ))
+                                          : null,
                                       border: Border.all(
                                         color: Colors.white.withOpacity(0.45),
                                         width: 1.5,
