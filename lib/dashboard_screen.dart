@@ -85,8 +85,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       AppCore.aiAssistantAvailableNotifier.value = true;
       AiAssistantController.instance.dispatcher.onCommand = _handleAiCommand;
     }
-    _studentCount = widget.allStudents.whereType>().length;
-    _teacherCount = widget.allTeachers.whereType>().length;
+    _studentCount = widget.allStudents.whereType<Map>().length;
+    _teacherCount = widget.allTeachers.whereType<Map>().length;
     _employeeCount = 0;
     _restoreCachedCounts();
     _refreshDashboardCounts();
@@ -146,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final data = _unwrap(jsonDecode(utf8.decode(r.bodyBytes)));
       if (data is List) {
         final students = data
-            .whereType>()
+            .whereType<Map>()
             .map((e) => JsonMap.from(e))
             .toList();
 
@@ -194,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final data = decoded is Map ? decoded['data'] : null;
         if (data is List) {
           teachers = data
-              .whereType>()
+              .whereType<Map>()
               .map((e) => JsonMap.from(e))
               .toList();
 
@@ -246,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final decoded = jsonDecode(utf8.decode(listResponse.bodyBytes));
         final data = decoded is Map ? decoded['data'] : null;
         if (data is List) {
-          employees = data.whereType>().map((e) => JsonMap.from(e)).toList();
+          employees = data.whereType<Map>().map((e) => JsonMap.from(e)).toList();
         }
       }
       int count = employees.length;

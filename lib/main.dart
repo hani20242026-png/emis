@@ -8,7 +8,6 @@ import 'package:webview_windows/webview_windows.dart' as wv;
 import 'app_core.dart';
 import 'app_keyboard_navigation.dart';
 import 'app_navigator.dart';
-import 'dashboard_screen.dart';
 import 'intro_screen.dart';
 
 Future<void> main() async {
@@ -24,49 +23,14 @@ class EmisAssistantApp extends StatefulWidget {
   State<EmisAssistantApp> createState() => _EmisAssistantAppState();
 }
 
-class _EmisAssistantAppState extends State<EmisAssistantApp>
-    with WidgetsBindingObserver {
-  final GlobalKey<NavigatorState> _navKey = appNavigatorKey;
+class _EmisAssistantAppState extends State<EmisAssistantApp> {
+  final GlobalKey<NavigatorState> _navKey = emisNavigatorKey;
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      unawaited(AppCore.persistSessionState());
-    }
-  }
-
   Widget _home() {
-    if (AppCore.hasActiveSession) {
-      return DashboardScreen(
-        token: AppCore.token,
-        schoolId: AppCore.schoolId,
-        schoolName: AppCore.schoolName,
-        userName: '',
-        allStudents: const <dynamic>[],
-        allTeachers: const <dynamic>[],
-        stages: const >[],
-        subjectsByStage: const <String, List>>{},
-        examsBySubject: const <String, List>>{},
-      );
-    }
-    if (!AppCore.introSeen) {
-      return const IntroScreen();
-    }
+    // Authentication and school selection are handled by IntroScreen /
+    // EmisWebviewScreen. AppCore intentionally does not own a duplicate session.
     return const IntroScreen();
   }
 
@@ -193,7 +157,7 @@ class _EmisAssistantAppState extends State<EmisAssistantApp>
             final safeChild = child ?? const SizedBox.shrink();
             return Directionality(
               textDirection: TextDirection.rtl,
-              child: AppKeyboardNavigationPolicy(
+              child: AppKeyboardNavigation(
                 child: _WindowsWebViewOverlayHost(
                   child: safeChild,
                 ),

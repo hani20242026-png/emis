@@ -28,6 +28,9 @@ class AppCore {
 
   static SharedPreferences? _preferences;
 
+  /// Optional Windows WebView authentication bridge installed by the app shell.
+  static Future<String?> Function(String initialUrl)? windowsWebViewAuthHandler;
+
   /// SharedPreferences cache used by screens that read lightweight feature flags[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span).
   static SharedPreferences get prefs {
     final instance = _preferences;

@@ -33,9 +33,9 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
   Future<bool>? _refreshingTokenFuture;
   bool _hasTriedRefreshOn403 = false;
 
-  List> _stages = [];
-  final Map<String, List>> _subjectsByStage = {};
-  final Map<String, List>> _examsBySubject = {};
+  List<Map<String, dynamic>> _stages = [];
+  final Map<String, List<Map<String, dynamic>>> _subjectsByStage = {};
+  final Map<String, List<Map<String, dynamic>>> _examsBySubject = {};
 
   @override
   void initState() {
@@ -213,7 +213,7 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     return <dynamic>[];
   }
 
-  List> _smartMaps(dynamic value) {
+  List<Map<String, dynamic>> _smartMaps(dynamic value) {
     final list = _smartExtractList(value);
     return [
       for (final item in list)
@@ -352,7 +352,7 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       ...stagesToCache.map(_catalogId),
     }.where((id) => id.isNotEmpty).toList();
 
-    final cachedRoomsByStage = <String, List>>{};
+    final cachedRoomsByStage = <String, List<dynamic>>{};
     final cachedDetailsByStage = <String, Map<String, dynamic>>{};
 
     if (!mounted) return;
