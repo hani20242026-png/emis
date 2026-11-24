@@ -1,147 +1,73 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:http/http.dart' as http;
-
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'app_core.dart';
 
+enum TransferDirection { outgoing, incoming }
 
-Widget _transferMenuHeader({
-  required bool isDark,
-  required String title,
-  required String subtitle,
-  required Color accent,
-  required IconData icon,
-  required VoidCallback onBack,
-}) {
-  final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-  final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: isDark
-          ? const LinearGradient(colors: [Color(0xFF141829), Color(0xFF19162E)])
-          : const LinearGradient(colors: [Colors.white, Color(0xFFF8FAFC)]),
-      borderRadius: BorderRadius.circular(26),
-      border: Border.all(color: accent.withOpacity(0.32), width: 1.3),
-      boxShadow: [
-        BoxShadow(color: accent.withOpacity(0.10), blurRadius: 20, offset: const Offset(0, 7)),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: accent.withOpacity(0.14)),
-          child: Icon(icon, color: accent, size: 28),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              Text(subtitle, style: TextStyle(color: mutedColor, fontSize: 11.5, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: onBack,
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textColor, size: 19),
-          style: IconButton.styleFrom(
-            backgroundColor: accent.withOpacity(0.10),
-            side: BorderSide(color: accent.withOpacity(0.25)),
-            fixedSize: const Size(44, 44),
-          ),
-        ),
-      ],
-    ),
-  );
-}
+class _TransferApi {
+  static const String root = 'https://emis.moedu.gov.iq/api';
 
-Widget _transferMenuCard({
-  required bool isDark,
-  required String title,
-  required String subtitle,
-  required String badgeText,
-  required IconData icon,
-  required Color accent,
-  required VoidCallback onTap,
-}) {
-  final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-  final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Ink(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? LinearGradient(colors: [const Color(0xFF141829), Color.lerp(const Color(0xFF101525), accent, 0.12)!])
-              : const LinearGradient(colors: [Colors.white, Color(0xFFF8FAFC)]),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accent.withOpacity(isDark ? 0.38 : 0.28), width: 1.2),
-          boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 5))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: accent.withOpacity(0.14)),
-              child: Icon(icon, color: accent, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: textColor, fontSize: 15.5, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 5),
-                  Text(subtitle, style: TextStyle(color: mutedColor, fontSize: 11.5, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(color: accent.withOpacity(0.13), borderRadius: BorderRadius.circular(20)),
-                  child: Text(badgeText, style: TextStyle(color: accent, fontSize: 10.5, fontWeight: FontWeight.w900)),
-                ),
-                const SizedBox(height: 8),
-                Icon(Icons.chevron_left_rounded, color: accent, size: 25),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
+  static Map<String, String> headers(String token) => {
+        'Authorization': token,
+        'Accept': 'application/json',
+      };
 
-enum TransferDirection {
-  outgoing,
-  incoming,
+  static dynamic decode(http.Response r) {
+    final text = utf8.decode(r.bodyBytes);
+    if (r.statusCode < 200 || r.statusCode >= 300) {
+      throw Exception('HTTP ${r.statusCode}: ${text.isEmpty ? "فشل الطلب" : text}');
+    }
+    if (text.trim().isEmpty) return null;
+    return jsonDecode(text);
+  }
+
+  static Future<dynamic> get(String token, String path) async {
+    final r = await http
+        .get(Uri.parse('$root$path'), headers: headers(token))
+        .timeout(const Duration(seconds: 35));
+    return decode(r);
+  }
+
+  static Future<void> postMultipart(
+    String token,
+    String path,
+    Map<String, String> fields,
+    List<PlatformFile> files,
+  ) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$root$path'));
+    request.headers.addAll(headers(token));
+    request.fields.addAll(fields);
+    for (final file in files) {
+      final bytes = file.bytes;
+      if (bytes == null) continue;
+      request.files.add(http.MultipartFile.fromBytes(
+        'attachments',
+        bytes,
+        filename: file.name,
+      ));
+    }
+    final streamed = await request.send().timeout(const Duration(seconds: 90));
+    final response = await http.Response.fromStream(streamed);
+    decode(response);
+  }
+
+  static Future<void> post(String token, String path) async {
+    final r = await http
+        .post(Uri.parse('$root$path'), headers: headers(token))
+        .timeout(const Duration(seconds: 35));
+    decode(r);
+  }
 }
 
 class TransfersScreen extends StatefulWidget {
   final String token;
   final String schoolId;
-
-  const TransfersScreen({
-    super.key,
-    required this.token,
-    required this.schoolId,
-  });
+  const TransfersScreen({super.key, required this.token, required this.schoolId});
 
   @override
   State<TransfersScreen> createState() => _TransfersScreenState();
@@ -150,745 +76,13 @@ class TransfersScreen extends StatefulWidget {
 class _TransfersScreenState extends State<TransfersScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ambientController;
-
   @override
   void initState() {
     super.initState();
-    _ambientController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
+    _ambientController = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
   }
-
   @override
-  void dispose() {
-    _ambientController.dispose();
-    super.dispose();
-  }
-
-  Widget _buildAmbientGlow({required Color color, required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: AppCore.isWindows
-            ? null
-            : RadialGradient(
-                colors: [color, color.withOpacity(0.0)],
-              ),
-        color: AppCore.isWindows
-            ? AppCore.windowsGradientFallback(
-                RadialGradient(colors: [color, color.withOpacity(0.0)]),
-              )
-            : null,
-      ),
-    );
-  }
-
-  Widget _buildHeader({
-    required bool isDark,
-    required String title,
-    required String subtitle,
-    required Color accent,
-    required IconData icon,
-    required VoidCallback onBack,
-  }) {
-    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mutedColor =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
-    return AnimatedBuilder(
-      animation: _ambientController,
-      builder: (context, _) {
-        final pulse =
-            0.5 + 0.5 * math.sin(_ambientController.value * 2 * math.pi);
-
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: AppCore.isWindows
-                ? null
-                : isDark
-                    ? LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          Color.lerp(const Color(0xFF141829), accent, 0.16)!,
-                          const Color(0xFF12172A),
-                          const Color(0xFF19162E),
-                        ],
-                      )
-                    : LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          Colors.white,
-                          Color.lerp(const Color(0xFFF8FAFC), accent, 0.08)!,
-                        ],
-                      ),
-            color: AppCore.isWindows
-                ? AppCore.windowsGradientFallback(
-                    isDark
-                        ? LinearGradient(
-                            begin: Alignment.topRight,
-                            end: Alignment.bottomLeft,
-                            colors: [
-                              Color.lerp(
-                                  const Color(0xFF141829), accent, 0.16)!,
-                              const Color(0xFF12172A),
-                            ],
-                          )
-                        : const LinearGradient(
-                            colors: [Colors.white, Color(0xFFF8FAFC)],
-                          ),
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: accent.withOpacity(isDark ? 0.45 : 0.30),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withOpacity(0.12 + pulse * 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accent.withOpacity(0.15),
-                  border: Border.all(color: accent.withOpacity(0.5), width: 1.4),
-                ),
-                child: Icon(icon, color: accent, size: 28),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onBack,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDark
-                        ? Colors.white.withOpacity(0.08)
-                        : accent.withOpacity(0.10),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.18)
-                          : accent.withOpacity(0.28),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_ios_rounded,
-                    size: 19,
-                    color: isDark ? Colors.white : const Color(0xFF1E293B),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCategoryCard({
-    required bool isDark,
-    required String title,
-    required String subtitle,
-    required String badgeText,
-    required IconData icon,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
-    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mutedColor =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(26),
-        child: Ink(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: AppCore.isWindows
-                ? null
-                : isDark
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF141829).withOpacity(0.95),
-                          Color.lerp(const Color(0xFF0E1220), accent, 0.12)!,
-                        ],
-                      )
-                    : LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white,
-                          Color.lerp(const Color(0xFFF8FAFC), accent, 0.05)!,
-                        ],
-                      ),
-            color: AppCore.isWindows
-                ? AppCore.windowsGradientFallback(
-                    isDark
-                        ? const LinearGradient(
-                            colors: [Color(0xFF141829), Color(0xFF0E1220)],
-                          )
-                        : const LinearGradient(
-                            colors: [Colors.white, Color(0xFFF8FAFC)],
-                          ),
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: accent.withOpacity(isDark ? 0.48 : 0.32),
-              width: 1.4,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withOpacity(isDark ? 0.15 : 0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accent.withOpacity(0.15),
-                  border: Border.all(color: accent.withOpacity(0.5), width: 1.4),
-                ),
-                child: Icon(icon, color: accent, size: 29),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: accent.withOpacity(isDark ? 0.18 : 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: accent.withOpacity(0.4)),
-                          ),
-                          child: Text(
-                            badgeText,
-                            style: TextStyle(
-                              color: accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(
-                Icons.chevron_left_rounded,
-                color: accent,
-                size: 26,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _openStudentTransfers(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => StudentTransfersScreen(
-          token: widget.token,
-          schoolId: widget.schoolId,
-        ),
-      ),
-    );
-  }
-
-  void _openEmployeeTransfers(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EmployeeTransfersScreen(
-          token: widget.token,
-          schoolId: widget.schoolId,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const blueNeon = Color(0xFF3B82F6);
-    const purpleNeon = Color(0xFFA855F7);
-    const goldNeon = Color(0xFFF59E0B);
-
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppCore.themeNotifier,
-      builder: (context, mode, _) {
-        final isDark = mode == ThemeMode.dark;
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            backgroundColor:
-                isDark ? const Color(0xFF070913) : const Color(0xFFF2F5FA),
-            body: Stack(
-              children: [
-                Positioned(
-                  top: -50,
-                  right: -50,
-                  child: _buildAmbientGlow(
-                    color: blueNeon.withOpacity(isDark ? 0.18 : 0.12),
-                    size: 250,
-                  ),
-                ),
-                Positioned(
-                  bottom: -60,
-                  left: -60,
-                  child: _buildAmbientGlow(
-                    color: purpleNeon.withOpacity(isDark ? 0.16 : 0.11),
-                    size: 260,
-                  ),
-                ),
-                SafeArea(
-                  child: ListView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                    children: [
-                      _buildHeader(
-                        isDark: isDark,
-                        title: 'الانتقالات',
-                        subtitle: 'إدارة انتقالات الطلاب والموظفين في المدرسة',
-                        accent: goldNeon,
-                        icon: Icons.swap_horiz_rounded,
-                        onBack: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(height: 18),
-                      _buildCategoryCard(
-                        isDark: isDark,
-                        title: 'انتقالات الطلاب',
-                        subtitle: 'الانتقالات الصادرة والانتقالات الواردة للطلاب',
-                        badgeText: 'صادرة / واردة',
-                        icon: Icons.school_rounded,
-                        accent: blueNeon,
-                        onTap: () => _openStudentTransfers(context),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildCategoryCard(
-                        isDark: isDark,
-                        title: 'انتقالات الموظفين',
-                        subtitle: 'الانتقالات الصادرة والانتقالات الواردة للموظفين',
-                        badgeText: 'صادرة / واردة',
-                        icon: Icons.badge_rounded,
-                        accent: purpleNeon,
-                        onTap: () => _openEmployeeTransfers(context),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class StudentTransfersScreen extends StatefulWidget {
-  final String token;
-  final String schoolId;
-
-  const StudentTransfersScreen({
-    super.key,
-    required this.token,
-    required this.schoolId,
-  });
-
-  @override
-  State<StudentTransfersScreen> createState() => _StudentTransfersScreenState();
-}
-
-class _StudentTransfersScreenState extends State<StudentTransfersScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ambientController;
-
-  @override
-  void initState() {
-    super.initState();
-    _ambientController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ambientController.dispose();
-    super.dispose();
-  }
-
-  void _openDirection(BuildContext context, TransferDirection direction) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TransferDirectionScreen(
-          token: widget.token,
-          schoolId: widget.schoolId,
-          targetLabel: 'الطلاب',
-          direction: direction,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const blueNeon = Color(0xFF3B82F6);
-    const orangeNeon = Color(0xFFF97316);
-    const emeraldNeon = Color(0xFF10B981);
-
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppCore.themeNotifier,
-      builder: (context, mode, _) {
-        final isDark = mode == ThemeMode.dark;
-
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            backgroundColor:
-                isDark ? const Color(0xFF070913) : const Color(0xFFF2F5FA),
-            body: SafeArea(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                children: [
-                  _transferMenuHeader(
-                        isDark: isDark,
-                        title: 'انتقالات الطلاب',
-                        subtitle: 'اختر الانتقالات الصادرة أو الانتقالات الواردة',
-                        accent: blueNeon,
-                        icon: Icons.school_rounded,
-                        onBack: () => Navigator.of(context).pop(),
-                      ),
-                  const SizedBox(height: 18),
-                  _transferMenuCard(
-                        isDark: isDark,
-                        title: 'الانتقالات الصادرة',
-                        subtitle: 'طلاب منتقلون من المدرسة إلى مدارس أخرى',
-                        badgeText: 'صادرة',
-                        icon: Icons.call_made_rounded,
-                        accent: orangeNeon,
-                        onTap: () =>
-                            _openDirection(context, TransferDirection.outgoing),
-                      ),
-                  const SizedBox(height: 14),
-                  _transferMenuCard(
-                        isDark: isDark,
-                        title: 'الانتقالات الواردة',
-                        subtitle: 'طلاب منتقلون إلى المدرسة من مدارس أخرى',
-                        badgeText: 'واردة',
-                        icon: Icons.call_received_rounded,
-                        accent: emeraldNeon,
-                        onTap: () =>
-                            _openDirection(context, TransferDirection.incoming),
-                      ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class EmployeeTransfersScreen extends StatefulWidget {
-  final String token;
-  final String schoolId;
-
-  const EmployeeTransfersScreen({
-    super.key,
-    required this.token,
-    required this.schoolId,
-  });
-
-  @override
-  State<EmployeeTransfersScreen> createState() =>
-      _EmployeeTransfersScreenState();
-}
-
-class _EmployeeTransfersScreenState extends State<EmployeeTransfersScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ambientController;
-
-  @override
-  void initState() {
-    super.initState();
-    _ambientController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ambientController.dispose();
-    super.dispose();
-  }
-
-  void _openDirection(BuildContext context, TransferDirection direction) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TransferDirectionScreen(
-          token: widget.token,
-          schoolId: widget.schoolId,
-          targetLabel: 'الموظفين',
-          direction: direction,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const purpleNeon = Color(0xFFA855F7);
-    const orangeNeon = Color(0xFFF97316);
-    const emeraldNeon = Color(0xFF10B981);
-
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppCore.themeNotifier,
-      builder: (context, mode, _) {
-        final isDark = mode == ThemeMode.dark;
-
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            backgroundColor:
-                isDark ? const Color(0xFF070913) : const Color(0xFFF2F5FA),
-            body: SafeArea(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                children: [
-                  _transferMenuHeader(
-                        isDark: isDark,
-                        title: 'انتقالات الموظفين',
-                        subtitle: 'اختر الانتقالات الصادرة أو الانتقالات الواردة',
-                        accent: purpleNeon,
-                        icon: Icons.badge_rounded,
-                        onBack: () => Navigator.of(context).pop(),
-                      ),
-                  const SizedBox(height: 18),
-                  _transferMenuCard(
-                        isDark: isDark,
-                        title: 'الانتقالات الصادرة',
-                        subtitle: 'موظفون منتقلون من المدرسة إلى جهات أخرى',
-                        badgeText: 'صادرة',
-                        icon: Icons.call_made_rounded,
-                        accent: orangeNeon,
-                        onTap: () =>
-                            _openDirection(context, TransferDirection.outgoing),
-                      ),
-                  const SizedBox(height: 14),
-                  _transferMenuCard(
-                        isDark: isDark,
-                        title: 'الانتقالات الواردة',
-                        subtitle: 'موظفون منتقلون إلى المدرسة من جهات أخرى',
-                        badgeText: 'واردة',
-                        icon: Icons.call_received_rounded,
-                        accent: emeraldNeon,
-                        onTap: () =>
-                            _openDirection(context, TransferDirection.incoming),
-                      ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-
-class TransferDirectionScreen extends StatefulWidget {
-  final String token;
-  final String schoolId;
-  final String targetLabel;
-  final TransferDirection direction;
-
-  const TransferDirectionScreen({
-    super.key,
-    required this.token,
-    required this.schoolId,
-    required this.targetLabel,
-    required this.direction,
-  });
-
-  @override
-  State<TransferDirectionScreen> createState() => _TransferDirectionScreenState();
-}
-
-class _TransferDirectionScreenState extends State<TransferDirectionScreen> {
-  bool loading = true;
-  String? error;
-  List<Map<String, dynamic>> transfers = [];
-
-  bool get isStudent => widget.targetLabel == 'الطلاب';
-  bool get isOutgoing => widget.direction == TransferDirection.outgoing;
-
-  String get title =>
-      '${isOutgoing ? 'الانتقالات الصادرة' : 'الانتقالات الواردة'} — ${widget.targetLabel}';
-
-  Color get accent =>
-      isOutgoing ? const Color(0xFFF97316) : const Color(0xFF10B981);
-
-  Map<String, String> get _headers => {
-        'Authorization': widget.token,
-        'Accept': 'application/json',
-      };
-
-  String get _endpoint {
-    if (isStudent) {
-      return isOutgoing
-          ? '/studentTransfer/getstudenttransfers'
-          : '/studentTransfer/getstudenttransferrequests';
-    }
-    return isOutgoing
-        ? '/employeeTransfer/getoutgoingemployeetransfers'
-        : '/employeeTransfer/getSchoolincomingemployeetransfers';
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (mounted) {
-      setState(() {
-        loading = true;
-        error = null;
-      });
-    }
-    try {
-      final uri = Uri.https(
-        'emis.moedu.gov.iq',
-        '/api$_endpoint',
-        {
-          'page': '1',
-          'rowsPerPage': '20',
-          'sortBy': 'id',
-          'sortOrder': 'desc',
-          'entityId': widget.schoolId,
-        },
-      );
-      final response = await http.get(uri, headers: _headers);
-      final body = utf8.decode(response.bodyBytes);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('HTTP ${response.statusCode}: $body');
-      }
-      final decoded = jsonDecode(body);
-      dynamic raw = decoded is Map ? decoded['data'] : decoded;
-      if (raw is! List) {
-        throw Exception('صيغة استجابة الانتقالات غير متوقعة.');
-      }
-      final parsed = raw
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-      if (!mounted) return;
-      setState(() {
-        transfers = parsed;
-        loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        error = e.toString().replaceFirst('Exception: ', '');
-        loading = false;
-      });
-    }
-  }
-
-  String _value(Map<String, dynamic> item, String key) =>
-      (item[key] ?? '').toString().trim();
-
-  String _personName(Map<String, dynamic> item) => _value(
-        item,
-        isStudent ? 'studentFullName' : 'employeeFullName',
-      );
+  void dispose() { _ambientController.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -896,150 +90,420 @@ class _TransferDirectionScreenState extends State<TransferDirectionScreen> {
       valueListenable: AppCore.themeNotifier,
       builder: (context, mode, _) {
         final dark = mode == ThemeMode.dark;
-        final foreground = dark ? Colors.white : const Color(0xFF0F172A);
-        final muted = dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
             backgroundColor: dark ? const Color(0xFF070913) : const Color(0xFFF2F5FA),
-            body: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.arrow_back_ios_new_rounded, color: foreground),
-                          style: IconButton.styleFrom(
-                            backgroundColor: accent.withOpacity(0.10),
-                            fixedSize: const Size(44, 44),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(title, style: TextStyle(color: foreground, fontSize: 17, fontWeight: FontWeight.w900)),
-                        ),
-                        IconButton(
-                          onPressed: loading ? null : _load,
-                          icon: Icon(Icons.refresh_rounded, color: accent),
-                          tooltip: 'تحديث',
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: loading
-                        ? Center(child: CircularProgressIndicator(color: accent))
-                        : error != null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.cloud_off_rounded, color: accent, size: 42),
-                                      const SizedBox(height: 12),
-                                      Text('تعذر تحميل بيانات الانتقالات', style: TextStyle(color: foreground, fontWeight: FontWeight.w900, fontSize: 16)),
-                                      const SizedBox(height: 8),
-                                      Text(error!, textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12)),
-                                      const SizedBox(height: 16),
-                                      FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : transfers.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.swap_horiz_rounded, color: accent, size: 48),
-                                        const SizedBox(height: 12),
-                                        Text('لا توجد انتقالات لعرضها حالياً', style: TextStyle(color: foreground, fontWeight: FontWeight.w800)),
-                                      ],
-                                    ),
-                                  )
-                                : RefreshIndicator(
-                                    onRefresh: _load,
-                                    color: accent,
-                                    child: ListView.separated(
-                                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                                      itemCount: transfers.length,
-                                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                                      itemBuilder: (context, index) {
-                                        final item = transfers[index];
-                                        final name = _personName(item);
-                                        final from = _value(item, 'fromEntity');
-                                        final to = _value(item, 'toEntity');
-                                        final date = _value(item, 'date');
-                                        final status = _value(item, 'status');
-                                        final reason = _value(item, 'rejectionReason');
-                                        final transferType = _value(item, 'transferType');
-                                        return Container(
-                                          padding: const EdgeInsets.all(15),
-                                          decoration: BoxDecoration(
-                                            color: dark ? const Color(0xFF141829) : Colors.white,
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: accent.withOpacity(0.22)),
-                                            boxShadow: [BoxShadow(color: accent.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 4))],
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(name.isEmpty ? '—' : name, style: TextStyle(color: foreground, fontSize: 14, fontWeight: FontWeight.w900)),
-                                                  ),
-                                                  if (status.isNotEmpty)
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                                      decoration: BoxDecoration(color: accent.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-                                                      child: Text(status, style: TextStyle(color: accent, fontSize: 10.5, fontWeight: FontWeight.w800)),
-                                                    ),
-                                                ],
-                                              ),
-                                              if (transferType.isNotEmpty) ...[
-                                                const SizedBox(height: 7),
-                                                Text('نوع الانتقال: $transferType', style: TextStyle(color: muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                                              ],
-                                              const SizedBox(height: 10),
-                                              _detailLine('من', from, foreground, muted),
-                                              const SizedBox(height: 5),
-                                              _detailLine('إلى', to, foreground, muted),
-                                              if (date.isNotEmpty) ...[
-                                                const SizedBox(height: 8),
-                                                _detailLine('التاريخ', date, foreground, muted),
-                                              ],
-                                              if (reason.isNotEmpty) ...[
-                                                const SizedBox(height: 8),
-                                                _detailLine('الملاحظات', reason, foreground, muted),
-                                              ],
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                  ),
-                ],
-              ),
-            ),
+            appBar: AppBar(title: const Text('الانتقالات'), backgroundColor: Colors.transparent, elevation: 0),
+            body: ListView(padding: const EdgeInsets.all(16), children: [
+              _menuCard(context, 'انتقالات الطلاب', 'إضافة طلب نقل طالب ومتابعة الصادر والوارد وإلغاء الطلب', Icons.school_rounded, Colors.blue, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => _TransferListScreen(token: widget.token, schoolId: widget.schoolId, isEmployee: false, direction: TransferDirection.outgoing)));
+              }),
+              const SizedBox(height: 14),
+              _menuCard(context, 'انتقالات الموظفين والمدرسين', 'إضافة نقل أو تنسيب أو تكليف أو إكمال نصاب ومتابعة الطلبات', Icons.badge_rounded, Colors.deepPurple, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => _TransferListScreen(token: widget.token, schoolId: widget.schoolId, isEmployee: true, direction: TransferDirection.outgoing)));
+              }),
+            ]),
           ),
         );
       },
     );
   }
 
-  Widget _detailLine(String label, String value, Color foreground, Color muted) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(width: 54, child: Text('$label:', style: TextStyle(color: muted, fontSize: 11.5, fontWeight: FontWeight.w700))),
-        Expanded(child: Text(value.isEmpty ? '—' : value, style: TextStyle(color: foreground, fontSize: 11.5, fontWeight: FontWeight.w700))),
+  Widget _menuCard(BuildContext context, String title, String subtitle, IconData icon, Color color, VoidCallback tap) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: tap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(children: [
+            CircleAvatar(radius: 28, backgroundColor: color.withOpacity(.12), child: Icon(icon, color: color, size: 29)),
+            const SizedBox(width: 15),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              const SizedBox(height: 6),
+              Text(subtitle, style: TextStyle(color: Theme.of(context).hintColor, height: 1.4)),
+            ])),
+            Icon(Icons.chevron_left, color: color),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransferListScreen extends StatefulWidget {
+  final String token;
+  final String schoolId;
+  final bool isEmployee;
+  final TransferDirection direction;
+  const _TransferListScreen({required this.token, required this.schoolId, required this.isEmployee, required this.direction});
+
+  @override
+  State<_TransferListScreen> createState() => _TransferListScreenState();
+}
+
+class _TransferListScreenState extends State<_TransferListScreen> {
+  bool loading = true;
+  String? error;
+  List<Map<String, dynamic>> records = [];
+  TransferDirection direction = TransferDirection.outgoing;
+
+  bool get employee => widget.isEmployee;
+  String get base => employee ? 'employeeTransfer' : 'studentTransfer';
+  String get listPath {
+    final endpoint = employee
+        ? (direction == TransferDirection.outgoing ? 'getoutgoingemployeetransfers' : 'getSchoolincomingemployeetransfers')
+        : (direction == TransferDirection.outgoing ? 'getstudenttransfers' : 'getstudenttransferrequests');
+    return '/$base/$endpoint?page=1&rowsPerPage=100&sortBy=id&sortOrder=desc&entityId=${Uri.encodeQueryComponent(widget.schoolId)}';
+  }
+
+  @override
+  void initState() { super.initState(); direction = widget.direction; _load(); }
+
+  Future<void> _load() async {
+    setState(() { loading = true; error = null; });
+    try {
+      final decoded = await _TransferApi.get(widget.token, listPath);
+      final data = decoded is Map ? decoded['data'] : decoded;
+      final list = data is List ? data : <dynamic>[];
+      records = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      if (mounted) setState(() => loading = false);
+    } catch (e) {
+      if (mounted) setState(() { loading = false; error = e.toString(); });
+    }
+  }
+
+  Future<void> _cancel(Map<String, dynamic> item) async {
+    final id = item['id'];
+    if (id == null) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('تأكيد إلغاء النقل'),
+      content: Text('هل تريد إلغاء طلب نقل ${employee ? (item['employeeFullName'] ?? '') : (item['studentFullName'] ?? '')}؟'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('إلغاء النقل')),
       ],
+    ));
+    if (confirmed != true) return;
+    try {
+      final endpoint = employee ? 'cancelemployeetransfer' : 'cancelstudenttransfer';
+      final idKey = employee ? 'employeeTransferId' : 'studentTransferId';
+      await _TransferApi.post(widget.token, '/$base/$endpoint?$idKey=$id&entityId=${Uri.encodeQueryComponent(widget.schoolId)}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب إلغاء النقل بنجاح')));
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إلغاء النقل: $e')));
+    }
+  }
+
+  Future<void> _add() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TransferFormDialog(token: widget.token, schoolId: widget.schoolId, isEmployee: employee),
+    );
+    if (result == true) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = employee ? Colors.deepPurple : Colors.blue;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(employee ? 'انتقالات الموظفين' : 'انتقالات الطلاب'),
+          actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _add,
+          icon: const Icon(Icons.add),
+          label: Text(employee ? 'إضافة نقل موظف' : 'نقل طالب'),
+        ),
+        body: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: SegmentedButton<TransferDirection>(
+              segments: const [
+                ButtonSegment(value: TransferDirection.outgoing, label: Text('الصادرة'), icon: Icon(Icons.call_made)),
+                ButtonSegment(value: TransferDirection.incoming, label: Text('الواردة'), icon: Icon(Icons.call_received)),
+              ],
+              selected: {direction},
+              onSelectionChanged: (s) { setState(() => direction = s.first); _load(); },
+            ),
+          ),
+          Expanded(child: _body(accent)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _body(Color accent) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.cloud_off, size: 42, color: Colors.redAccent),
+      const SizedBox(height: 10), Text(error!, textAlign: TextAlign.center),
+      const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
+    ])));
+    if (records.isEmpty) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.inbox_outlined, size: 56, color: accent.withOpacity(.7)),
+      const SizedBox(height: 12), const Text('لا توجد عمليات انتقال حالياً'),
+      const SizedBox(height: 12), OutlinedButton.icon(onPressed: _add, icon: const Icon(Icons.add), label: const Text('إضافة عملية نقل')),
+    ]));
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 90),
+        itemCount: records.length,
+        itemBuilder: (context, i) {
+          final item = records[i];
+          final name = employee ? item['employeeFullName'] : item['studentFullName'];
+          final status = (item['status'] ?? 'غير محدد').toString();
+          final cancelable = direction == TransferDirection.outgoing &&
+              !['ملغي', 'مرفوض', 'منتهي', 'مقبول'].contains(status);
+          final attachments = item['attachments'] is List ? (item['attachments'] as List).length : 0;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(child: Text((name ?? 'بدون اسم').toString(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15))),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5), decoration: BoxDecoration(color: _statusColor(status).withOpacity(.12), borderRadius: BorderRadius.circular(20)), child: Text(status, style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.bold, fontSize: 11))),
+                ]),
+                const SizedBox(height: 10),
+                _info('من', item['fromEntity']),
+                _info('إلى', item['toEntity']),
+                if (employee) _info('نوع العملية', item['transferType']),
+                _info('التاريخ', item['date']),
+                if (employee && item['endDate'] != null) _info('تاريخ الانتهاء', item['endDate']),
+                if (item['rejectionReason']?.toString().isNotEmpty == true) _info('ملاحظات', item['rejectionReason']),
+                if (attachments > 0) _info('المرفقات', '$attachments ملف'),
+                if (cancelable) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                  onPressed: () => _cancel(item),
+                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                  label: const Text('إلغاء النقل', style: TextStyle(color: Colors.red)),
+                )),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _info(String label, dynamic value) {
+    if (value == null || value.toString().isEmpty) return const SizedBox.shrink();
+    return Padding(padding: const EdgeInsets.only(bottom: 5), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 92, child: Text('$label:', style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12))),
+      Expanded(child: Text(value.toString(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+    ]));
+  }
+
+  Color _statusColor(String status) {
+    if (status.contains('مقبول')) return Colors.green;
+    if (status.contains('مرفوض') || status == 'ملغي') return Colors.red;
+    if (status.contains('مراجعة')) return Colors.orange;
+    return Colors.blueGrey;
+  }
+}
+
+class _TransferFormDialog extends StatefulWidget {
+  final String token;
+  final String schoolId;
+  final bool isEmployee;
+  const _TransferFormDialog({required this.token, required this.schoolId, required this.isEmployee});
+
+  @override
+  State<_TransferFormDialog> createState() => _TransferFormDialogState();
+}
+
+class _TransferFormDialogState extends State<_TransferFormDialog> {
+  final _searchController = TextEditingController();
+  final _stageController = TextEditingController(text: '1159');
+  final _endDateController = TextEditingController();
+  List<Map<String, dynamic>> people = [];
+  List<Map<String, dynamic>> entities = [];
+  List<PlatformFile> files = [];
+  Map<String, dynamic>? selectedPerson;
+  Map<String, dynamic>? selectedEntity;
+  bool loadingPeople = false;
+  bool loadingEntities = false;
+  bool saving = false;
+  String transferType = 'نقل';
+  bool isTeacher = false;
+  String? error;
+
+  bool get employee => widget.isEmployee;
+  static const Map<String, String> transferTypes = {'نقل': '1', 'تنسیب': '2', 'تكليف': '3', 'إكمال نصاب': '4'};
+
+  @override
+  void initState() { super.initState(); _loadEntities(); _loadPeople(); }
+  @override
+  void dispose() { _searchController.dispose(); _stageController.dispose(); _endDateController.dispose(); super.dispose(); }
+
+  Future<void> _loadPeople() async {
+    setState(() { loadingPeople = true; error = null; });
+    try {
+      dynamic decoded;
+      if (employee) {
+        decoded = await _TransferApi.get(widget.token, '/employee/getemployeesbyentities?page=1&rowsPerPage=1000&sortBy=id&sortOrder=desc&entityId=${widget.schoolId}&isTeacher=$isTeacher');
+      } else {
+        decoded = await _TransferApi.get(widget.token, '/selectoption/getstudentsbyschoolsandstages/${widget.schoolId}/${_stageController.text.trim()}');
+      }
+      final list = decoded is List ? decoded : (decoded is Map && decoded['data'] is List ? decoded['data'] : []);
+      if (mounted) setState(() {
+        people = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        loadingPeople = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { loadingPeople = false; error = 'تعذر تحميل قائمة ${employee ? "الموظفين" : "الطلاب"}: $e'; });
+    }
+  }
+
+  Future<void> _loadEntities([String query = '']) async {
+    setState(() => loadingEntities = true);
+    try {
+      final path = !employee && query.trim().isNotEmpty
+          ? '/school/GetAllSchoolsByStageOrderAndGender/9/1/25/${Uri.encodeComponent(query.trim())}'
+          : (query.trim().isEmpty
+              ? '/MinistryEntity/GetAllMinistryEntitiesWithSchools${employee ? '' : '/160'}'
+              : '/MinistryEntity/SearchAndGetAllMinistryEntitiesWithSchools/${Uri.encodeComponent(query.trim())}');
+      final decoded = await _TransferApi.get(widget.token, path);
+      final list = decoded is List ? decoded : (decoded is Map && decoded['data'] is List ? decoded['data'] : []);
+      if (mounted) setState(() { entities = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); loadingEntities = false; });
+    } catch (e) {
+      if (mounted) setState(() { loadingEntities = false; error = 'تعذر تحميل الجهات: $e'; });
+    }
+  }
+
+  Future<void> _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true, type: FileType.custom, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png']);
+    if (result != null && mounted) setState(() => files = result.files);
+  }
+
+  String _personName(Map<String, dynamic> p) =>
+      (p['displayName'] ?? p['fullName'] ?? p['employeeFullName'] ?? p['employeeName'] ?? p['name'] ?? '${p['firstName'] ?? ''} ${p['lastName'] ?? ''}').toString().trim();
+  String _personId(Map<String, dynamic> p) => (p['value'] ?? p['id'] ?? p['employeeId'] ?? '').toString();
+  String _entityName(Map<String, dynamic> e) => (e['name'] ?? e['displayName'] ?? '').toString();
+  String _entityId(Map<String, dynamic> e) => (e['id'] ?? e['value'] ?? '').toString();
+
+  Future<void> _save() async {
+    if (selectedPerson == null || selectedEntity == null) {
+      setState(() => error = 'يرجى اختيار ${employee ? "الموظف" : "الطالب"} والجهة المستقبلة');
+      return;
+    }
+    if (employee && _endDateController.text.trim().isEmpty && transferType != 'نقل') {
+      setState(() => error = 'يرجى تحديد تاريخ انتهاء العملية');
+      return;
+    }
+    setState(() { saving = true; error = null; });
+    try {
+      final fields = <String, String>{
+        'fromEntityId': widget.schoolId,
+        'toEntityId': _entityId(selectedEntity!),
+      };
+      if (employee) {
+        fields['employeeId'] = _personId(selectedPerson!);
+        fields['transferType'] = transferTypes[transferType]!;
+        if (_endDateController.text.trim().isNotEmpty) fields['endDate'] = _endDateController.text.trim();
+      } else {
+        fields['studentIds'] = _personId(selectedPerson!);
+      }
+      final endpoint = employee ? 'employeeTransfer/addemployeetransfer' : 'studentTransfer/addstudenttransfer';
+      await _TransferApi.postMultipart(widget.token, '/$endpoint?entityId=${widget.schoolId}', fields, files);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) setState(() { saving = false; error = 'فشل إرسال طلب النقل: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredPeople = people.where((p) => _personName(p).contains(_searchController.text)).take(100).toList();
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text(employee ? 'إضافة عملية نقل موظف' : 'إضافة طلب نقل طالب'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (!employee) ...[
+              TextField(controller: _stageController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'معرّف المرحلة الدراسية', helperText: 'القيمة 1159 مأخوذة من طلب HAR المسجل ويمكن تغييرها حسب المرحلة')),
+              Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: loadingPeople ? null : _loadPeople, icon: const Icon(Icons.refresh), label: const Text('تحميل الطلاب للمرحلة'))),
+            ],
+            if (employee) ...[
+              DropdownButtonFormField<bool>(
+                value: isTeacher,
+                decoration: const InputDecoration(labelText: 'فئة المنقول'),
+                items: const [
+                  DropdownMenuItem(value: false, child: Text('موظف')),
+                  DropdownMenuItem(value: true, child: Text('مدرس / معلم')),
+                ],
+                onChanged: (v) {
+                  setState(() { isTeacher = v ?? false; selectedPerson = null; });
+                  _loadPeople();
+                },
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+              value: transferType,
+              decoration: const InputDecoration(labelText: 'نوع العملية'),
+              items: transferTypes.keys.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => transferType = v ?? 'نقل'),
+            ),
+            ],
+            if (employee && transferType != 'نقل') TextField(
+              controller: _endDateController,
+              readOnly: true,
+              decoration: const InputDecoration(labelText: 'تاريخ الانتهاء', hintText: 'yyyy-mm-dd', suffixIcon: Icon(Icons.calendar_month)),
+              onTap: () async {
+                final now = DateTime.now();
+                final date = await showDatePicker(context: context, initialDate: now, firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 10));
+                if (date != null) _endDateController.text = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(controller: _searchController, decoration: InputDecoration(labelText: employee ? 'بحث عن الموظف' : 'بحث عن الطالب', prefixIcon: const Icon(Icons.search)), onChanged: (_) => setState(() {})),
+            if (loadingPeople) const LinearProgressIndicator(),
+            DropdownButtonFormField<Map<String, dynamic>>(
+              isExpanded: true,
+              value: selectedPerson,
+              decoration: InputDecoration(labelText: employee ? 'الموظف / المدرس' : 'الطالب'),
+              items: filteredPeople.map((p) => DropdownMenuItem(value: p, child: Text(_personName(p), overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: (v) => setState(() => selectedPerson = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(labelText: 'البحث عن الجهة المستقبلة', prefixIcon: Icon(Icons.search)),
+              onChanged: (v) { _loadEntities(v); },
+            ),
+            if (loadingEntities) const LinearProgressIndicator(),
+            DropdownButtonFormField<Map<String, dynamic>>(
+              isExpanded: true,
+              value: selectedEntity,
+              decoration: const InputDecoration(labelText: 'الجهة / المدرسة المستقبلة'),
+              items: entities.map((e) => DropdownMenuItem(value: e, child: Text(_entityName(e), overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: (v) => setState(() => selectedEntity = v),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(onPressed: _pickFiles, icon: const Icon(Icons.attach_file), label: Text(files.isEmpty ? 'إرفاق ملفات PDF أو صور' : 'المرفقات: ${files.length}')),
+            if (files.isNotEmpty) ...files.map((f) => Text('• ${f.name}', style: Theme.of(context).textTheme.bodySmall)),
+            if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+          ])),
+        ),
+        actions: [
+          TextButton(onPressed: saving ? null : () => Navigator.pop(context, false), child: const Text('إغلاق')),
+          FilledButton.icon(onPressed: saving ? null : _save, icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send), label: Text(saving ? 'جارٍ الإرسال...' : 'إرسال طلب النقل')),
+        ],
+      ),
     );
   }
 }
