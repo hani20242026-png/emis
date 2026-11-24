@@ -56,6 +56,12 @@ class _EmisAssistantAppState extends State<EmisAssistantApp>
         token: AppCore.token,
         schoolId: AppCore.schoolId,
         schoolName: AppCore.schoolName,
+        userName: '',
+        allStudents: const <dynamic>[],
+        allTeachers: const <dynamic>[],
+        stages: const >[],
+        subjectsByStage: const <String, List>>{},
+        examsBySubject: const <String, List>>{},
       );
     }
     if (!AppCore.introSeen) {
