@@ -33,9 +33,9 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
   Future<bool>? _refreshingTokenFuture;
   bool _hasTriedRefreshOn403 = false;
 
-  List<Map<String, dynamic>> _stages = [];
-  final Map<String, List<Map<String, dynamic>>> _subjectsByStage = {};
-  final Map<String, List<Map<String, dynamic>>> _examsBySubject = {};
+  List> _stages = [];
+  final Map<String, List>> _subjectsByStage = {};
+  final Map<String, List>> _examsBySubject = {};
 
   @override
   void initState() {
@@ -49,7 +49,6 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
   void dispose() {
     super.dispose();
   }
-
 
   Map<String, String> get _headers => {
         'Authorization': _activeToken.toLowerCase().startsWith('bearer ')
@@ -185,7 +184,18 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     if (decoded is List) return decoded;
     if (decoded is Map) {
       const candidateKeys = [
-        'data', 'items', 'result', 'results', 'records', 'value', 'exams', 'students', 'employees', 'stages', 'subjects', 'list',
+        'data',
+        'items',
+        'result',
+        'results',
+        'records',
+        'value',
+        'exams',
+        'students',
+        'employees',
+        'stages',
+        'subjects',
+        'list',
       ];
       for (final key in candidateKeys) {
         final val = decoded[key];
@@ -203,7 +213,7 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     return <dynamic>[];
   }
 
-  List<Map<String, dynamic>> _smartMaps(dynamic value) {
+  List> _smartMaps(dynamic value) {
     final list = _smartExtractList(value);
     return [
       for (final item in list)
@@ -235,7 +245,6 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
   }
 
   String _resolveUserName(Map<String, dynamic> userData) {
-    // API versions use different spellings for the same name components.
     final candidates = <String>[
       _cleanNamePart(userData['employeeName']),
       _cleanNamePart(userData['employeeFullName']),
@@ -248,10 +257,10 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       _cleanNamePart(userData['firstName']),
       _cleanNamePart(userData['fatherName'] ?? userData['secondName']),
       _cleanNamePart(userData['grandFatherName'] ?? userData['thirdName']),
-      _cleanNamePart(userData['lastName'] ?? userData['surname'] ?? userData['sureName']),
+      _cleanNamePart(
+          userData['lastName'] ?? userData['surname'] ?? userData['sureName']),
     ].where((value) => value.isNotEmpty).toList();
 
-    // Build a component-based name as a fallback and avoid adjacent duplicate parts.
     final uniqueParts = <String>[];
     for (final part in parts) {
       if (uniqueParts.isEmpty || uniqueParts.last != part) uniqueParts.add(part);
@@ -259,8 +268,6 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     final assembled = uniqueParts.join(' ');
     if (assembled.isNotEmpty) candidates.add(assembled);
 
-    // Prefer the candidate with the most name tokens. This avoids selecting a
-    // non-empty but abbreviated employeeName when a fuller name is also present.
     candidates.sort((a, b) {
       final aCount = a.split(RegExp(r'\s+')).length;
       final bCount = b.split(RegExp(r'\s+')).length;
@@ -271,7 +278,13 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
   }
 
   String _catalogId(Map<String, dynamic> item) {
-    final id = item['value'] ?? item['id'] ?? item['stageId'] ?? item['subjectId'] ?? item['key'] ?? item['code'] ?? '';
+    final id = item['value'] ??
+        item['id'] ??
+        item['stageId'] ??
+        item['subjectId'] ??
+        item['key'] ??
+        item['code'] ??
+        '';
     return id.toString().trim();
   }
 
@@ -283,7 +296,8 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     if (items.isEmpty) return;
     var nextIndex = 0;
     final safeConcurrency = maxConcurrent > 2 ? 2 : maxConcurrent;
-    final workerCount = items.length < safeConcurrency ? items.length : safeConcurrency;
+    final workerCount =
+        items.length < safeConcurrency ? items.length : safeConcurrency;
 
     Future<void> worker() async {
       while (true) {
@@ -312,11 +326,13 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
 
     final stagesResults = await Future.wait([
       _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/selectoption/getschoolstages/${widget.schoolId}'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/selectoption/getschoolstages/${widget.schoolId}'),
         debugLabel: 'الصفوف الدراسية',
       ),
       _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/selectoption/getAvailableStagesForStudent?schoolId=${widget.schoolId}'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/selectoption/getAvailableStagesForStudent?schoolId=${widget.schoolId}'),
         debugLabel: 'صفوف الطلاب المتاحة',
       ),
     ]);
@@ -327,7 +343,8 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       _stages = availableStudentStages;
     }
 
-    final stagesToCache = availableStudentStages.isNotEmpty ? availableStudentStages : _stages;
+    final stagesToCache =
+        availableStudentStages.isNotEmpty ? availableStudentStages : _stages;
     if (stagesToCache.isEmpty && _stages.isEmpty) return;
 
     final allStageIds = <String>{
@@ -335,7 +352,7 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       ...stagesToCache.map(_catalogId),
     }.where((id) => id.isNotEmpty).toList();
 
-    final cachedRoomsByStage = <String, List<Map<String, dynamic>>>{};
+    final cachedRoomsByStage = <String, List>>{};
     final cachedDetailsByStage = <String, Map<String, dynamic>>{};
 
     if (!mounted) return;
@@ -347,15 +364,18 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     await _runConcurrent(allStageIds, (stageId) async {
       final results = await Future.wait([
         _safeGetDecoded(
-          Uri.parse('https://emis.moedu.gov.iq/api/selectoption/getClassRooms?schoolId=${widget.schoolId}&stageId=$stageId'),
+          Uri.parse(
+              'https://emis.moedu.gov.iq/api/selectoption/getClassRooms?schoolId=${widget.schoolId}&stageId=$stageId'),
           debugLabel: 'شعب الصف $stageId',
         ),
         _safeGetDecoded(
-          Uri.parse('https://emis.moedu.gov.iq/api/selectoption/getstagedetails/$stageId'),
+          Uri.parse(
+              'https://emis.moedu.gov.iq/api/selectoption/getstagedetails/$stageId'),
           debugLabel: 'تفاصيل الصف $stageId',
         ),
         _safeGetDecoded(
-          Uri.parse('https://emis.moedu.gov.iq/api/subject/getsubjectsselect?stageId=$stageId&schoolId=${widget.schoolId}'),
+          Uri.parse(
+              'https://emis.moedu.gov.iq/api/subject/getsubjectsselect?stageId=$stageId&schoolId=${widget.schoolId}'),
           debugLabel: 'مواد الصف $stageId',
         ),
       ]);
@@ -400,18 +420,20 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       final subjectId = parts[1];
 
       final decoded = await _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/examscore/getexamsformarks?schoolId=${widget.schoolId}&stageId=$stageId&subjectId=$subjectId'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/examscore/getexamsformarks?schoolId=${widget.schoolId}&stageId=$stageId&subjectId=$subjectId'),
         debugLabel: 'امتحانات $key',
       );
 
-      final rawExams = (decoded is Map && decoded['exams'] != null) ? decoded['exams'] : decoded;
+      final rawExams =
+          (decoded is Map && decoded['exams'] != null) ? decoded['exams'] : decoded;
       _examsBySubject[key] = _smartMaps(rawExams);
 
       completedExams++;
       if (mounted && subjectKeys.isNotEmpty) {
         setState(() {
           _progressValue = .56 + (.06 * (completedExams / subjectKeys.length));
-            });
+        });
       }
     });
   }
@@ -424,7 +446,7 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       setState(() {
         _statusText = 'جاري جلب بيانات المستخدم...';
         _progressValue = .20;
-        });
+      });
       final userDecoded = await _safeGetDecoded(
         Uri.parse('https://emis.moedu.gov.iq/api/account/getloggedinuser'),
         debugLabel: 'بيانات المستخدم',
@@ -436,14 +458,21 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       setState(() {
         _statusText = 'جاري جلب بيانات المدرسة...';
         _progressValue = .38;
-        });
+      });
       String schoolName = 'المدرسة';
       final schoolDecoded = await _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/school/getschoolinformation/${widget.schoolId}'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/school/getschoolinformation/${widget.schoolId}'),
         debugLabel: 'بيانات المدرسة',
       );
       final schoolData = _smartExtractMap(schoolDecoded);
-      final extractedSchoolName = (schoolData['schoolName'] ?? schoolData['name'] ?? schoolData['entityName'] ?? schoolData['title'] ?? '').toString().trim();
+      final extractedSchoolName = (schoolData['schoolName'] ??
+              schoolData['name'] ??
+              schoolData['entityName'] ??
+              schoolData['title'] ??
+              '')
+          .toString()
+          .trim();
       if (extractedSchoolName.isNotEmpty) schoolName = extractedSchoolName;
 
       await _loadAcademicCatalog();
@@ -452,9 +481,10 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       setState(() {
         _statusText = 'جاري تحميل سجلات الطلاب...';
         _progressValue = .72;
-        });
+      });
       final studentsDecoded = await _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/student/getstudents?page=1&rowsPerPage=3000&sortBy=id&sortOrder=desc&entityId=${widget.schoolId}'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/student/getstudents?page=1&rowsPerPage=3000&sortBy=id&sortOrder=desc&entityId=${widget.schoolId}'),
         debugLabel: 'سجلات الطلاب',
       );
       final studentsData = _smartExtractList(studentsDecoded);
@@ -463,20 +493,22 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
       setState(() {
         _statusText = 'جاري تحميل سجلات المعلمين...';
         _progressValue = .88;
-        });
+      });
       final teachersDecoded = await _safeGetDecoded(
-        Uri.parse('https://emis.moedu.gov.iq/api/employee/getemployeesbyentities?page=1&rowsPerPage=1000&sortBy=id&sortOrder=desc&entityId=${widget.schoolId}&isTeacher=true'),
+        Uri.parse(
+            'https://emis.moedu.gov.iq/api/employee/getemployeesbyentities?page=1&rowsPerPage=1000&sortBy=id&sortOrder=desc&entityId=${widget.schoolId}&isTeacher=true'),
         debugLabel: 'سجلات المعلمين',
       );
       final teachersData = _smartExtractList(teachersDecoded);
+
+      // نقطة ربط بيانات الانتقالات (الصادرة والواردة للطلاب والموظفين) فور تزويد endpoints من HAR.
 
       if (!mounted) return;
       setState(() {
         _statusText = 'اكتملت المزامنة — تم الوصول بنجاح!';
         _progressValue = 1.0;
       });
-      
-      // مهلة قصيرة لعرض لقطة الفرح ووصول الطالب إلى نهاية الكلمة قبل الانتقال
+
       await Future<void>.delayed(const Duration(milliseconds: 1200));
 
       if (!mounted) return;
@@ -524,18 +556,32 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: AppCore.isWindows ? null : LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF42A5F5), Color(0xFF81C784)],
-            stops: [0.0, 0.35, 0.7, 1.0],
-          ),
-          color: AppCore.isWindows ? AppCore.windowsGradientFallback(LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF42A5F5), Color(0xFF81C784)],
-            stops: [0.0, 0.35, 0.7, 1.0],
-          )) : null,
+          gradient: AppCore.isWindows
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF1A237E),
+                    Color(0xFF283593),
+                    Color(0xFF42A5F5),
+                    Color(0xFF81C784),
+                  ],
+                  stops: [0.0, 0.35, 0.7, 1.0],
+                ),
+          color: AppCore.isWindows
+              ? AppCore.windowsGradientFallback(const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF1A237E),
+                    Color(0xFF283593),
+                    Color(0xFF42A5F5),
+                    Color(0xFF81C784),
+                  ],
+                  stops: [0.0, 0.35, 0.7, 1.0],
+                ))
+              : null,
         ),
         child: SafeArea(
           child: Center(
@@ -544,7 +590,6 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Lottie animation supplied by the user.
                   SizedBox(
                     height: 220,
                     width: double.infinity,
@@ -558,7 +603,11 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
                   const SizedBox(height: 5),
                   const Text(
                     'مساعد EMIS الذكي',
-                    style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
@@ -577,13 +626,19 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.sync_rounded, color: Colors.white, size: 22),
+                            const Icon(Icons.sync_rounded,
+                                color: Colors.white, size: 22),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 _statusText,
                                 textAlign: TextAlign.right,
-                                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -596,14 +651,19 @@ class _LoadingDataScreenState extends State<LoadingDataScreen> {
                             minHeight: 9,
                             backgroundColor: Colors.white24,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              isCompleted ? Colors.greenAccent : Colors.amberAccent,
+                              isCompleted
+                                  ? Colors.greenAccent
+                                  : Colors.amberAccent,
                             ),
                           ),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           '${(_progressValue * 100).round()}%',
-                          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
