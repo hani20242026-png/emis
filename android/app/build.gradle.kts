@@ -28,7 +28,8 @@ android {
         // The native library is compiled for API 23, so the app must not install below it.
         minSdk = 23
 
-        targetSdk = flutter.targetSdkVersion
+        // Google Play new-app requirement from 31 Aug 2026: Android 16 / API 36.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
