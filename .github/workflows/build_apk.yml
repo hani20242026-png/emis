@@ -264,6 +264,34 @@ jobs:
             --target-platform android-arm,android-arm64 \
             --dart-define=ENABLE_LOCAL_AI=${{ inputs.include_local_ai }}
 
+      - name: Build Android App Bundle (Google Play)
+        timeout-minutes: 35
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false -Dorg.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G"
+          ENABLE_LOCAL_AI: ${{ inputs.include_local_ai }}
+        run: |
+          flutter build appbundle --release \
+            --dart-define=ENABLE_LOCAL_AI=${{ inputs.include_local_ai }}
+
+      - name: Verify AAB output and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB="build/app/outputs/bundle/release/app-release.aab"
+          test -s "$AAB"
+          echo "AAB size: $(stat -c%s "$AAB") bytes"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null
+          echo "AAB signature verification passed."
+
+      - name: Upload Google Play AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.include_local_ai && 'emis-google-play-aab-with-ai' || 'emis-google-play-aab-no-ai' }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
       - name: Verify APK output
         shell: bash
         run: |
