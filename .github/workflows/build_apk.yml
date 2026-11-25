@@ -252,6 +252,19 @@ jobs:
           fi
           echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
+      - name: Print current signing certificate SHA256
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "=== SHA-256 fingerprint for alias emis-release ==="
+          keytool -list -v \
+            -keystore "$ANDROID_KEYSTORE_PATH" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "emis-release" \
+            | grep -i "SHA256:"
+
       - name: Build APK
         timeout-minutes: 35
         env:
